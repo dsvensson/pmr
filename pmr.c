@@ -290,7 +290,8 @@ int main(int argc, char **argv)
     }
     if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
       fprintf(stderr, "pmr %s: usage:\n\n", VERSION);
-      fprintf(stderr, " %s [-t seconds] [-c] [-p] [-b size] [-r] [-h/--help] [-v]\n\n", argv[0]);
+      fprintf(stderr, " %s [-l Bps] [-t seconds] [-c] [-p] [-b size] [-r] [-h/--help] [-v]\n\n", argv[0]);
+      fprintf(stderr, " -l Bps\t\tlimit throughput to 'Bps' bytes per second\n");
       fprintf(stderr, " -t secs\tupdate interval in seconds\n");
       fprintf(stderr, " -c\t\tprints byte count during progress\n");
       fprintf(stderr, " -p\t\tenables 4k page poking (useless)\n");
