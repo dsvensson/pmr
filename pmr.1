@@ -40,7 +40,6 @@ Display help
 .B \-v
 Display version information
 
-
 .SH EXAMPLES
 .nf
 Transfer SHELL_PATTERN files with netcat to a host:
@@ -52,7 +51,12 @@ Generate lots of context switches:
 .ft B
 pmr < /dev/zero |cat > /dev/zero
 
+.SH CONFORMING TO
+The bandwidth is printed in IEC 60027-2 (2000-11) Ed. 2.0 recommended 
+format (KiB, MiB, GiB, ...).
 
 .SH AUTHOR
-Heikki Orsila <heikki.orsila@iki.fi>
+.B pmr
+was written by Heikki Orsila <heikki.orsila@iki.fi>. His web page is
+located at http://www.iki.fi/shd/
 .br

@@ -10,8 +10,7 @@ for opt in "$@" ; do
 	--package-prefix=*)
 		packageprefix=`echo $opt | sed -n 's/--package-prefix=\(.*\)/\1/p'`
 		;;
-	*)
-		echo "configure parameter error"
+	--help)
 		echo ""
 		echo "valid options are:"
 		echo "--prefix dir           install pipemeter to prefix 'dir'"

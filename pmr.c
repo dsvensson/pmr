@@ -73,6 +73,7 @@ HISTORY
                            foss/pmr/, and changed printed speed units to
                            IEC 60027-2 (2000-11) Ed. 2.0.
 			   kB => KiB, MB => MiB, GB => GiB, TB => TiB
+   20050308 version 0.09 - edited man page.
 */
 
 #include <stdio.h>
