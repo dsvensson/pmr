@@ -1,24 +1,25 @@
-.TH pipemeter 1 "2004/02/27" Linux "user commands"
+.TH pmr 1 "2004/02/27" Linux "user commands"
 
 .SH NAME
-pipemeter \- command line pipe measurement tool for Unixes
+pmr \- command line pipe measurement tool for Unixes
 
 .SH SYNTAX
-.B pipemeter
-[\fB-c\fR] [\fB-r\fR] [\fB-t secs\fR] [\fB-b size\fR] [\fB-v\fR]
+.B pmr
+[\fB-l Bps\fR] [\fB-r\fR] [\fB-t secs\fR] [\fB-b size\fR] [\fB-v\fR]
 
 .SH VERSION
-This man page documents pipemeter version 0.06 and maybe later.
+This man page documents pmr version 0.07 and maybe later.
 
 .SH DESCRIPTION
-.I pipemeter
+.I pmr
 is a command line tool to measure bandwidth and amount of bytes going through
 the pipe.
 
 .SH OPTIONS
 .TP
-.B \-c
-Display amount of bytes tranferred
+.BI \-l " Bps"
+Limit throughput to a given bytes per second rate
+.I Bps
 .TP
 .B \-r
 Don't print new lines on output, use carriage return
@@ -44,12 +45,12 @@ Display version information
 .nf
 Transfer SHELL_PATTERN files with netcat to a host:
 .ft B
-tar cvf - SHELL_PATTERN |pipemeter -c |nc host port
+tar cvf - SHELL_PATTERN |pmr |nc host port
 
 .ft R
 Generate lots of context switches:
 .ft B
-pipemeter < /dev/zero |cat > /dev/zero
+pmr < /dev/zero |cat > /dev/zero
 
 
 .SH AUTHOR

@@ -227,7 +227,6 @@ int main(int argc, char **argv)
   int i, ret, readoffs, rbytes;
   long long wbytes;
   long long tbytes;
-  int use_counter = 0;
   int poke_mem = 0;
   char info[256];
   int valid_time = 1;
@@ -276,7 +275,7 @@ int main(int argc, char **argv)
       continue;
     }
     if (!strcmp(argv[i], "-c")) {
-      use_counter = 1;
+      fprintf(stderr, "pmr: -c has no effect anymore (since version 0.07). do not use it!\n");
       i++;
       continue;
     }
@@ -372,11 +371,10 @@ int main(int argc, char **argv)
 	}
       }
       if (valid_time && timetest(info, &ot, &wbytes, 0)) {
-	if (use_counter) {
-	  char byte_info[256];
-	  sprintf(byte_info, "\tbytes: %lld", tbytes);
-	  strcat(info, byte_info);
-	}
+	char byte_info[256];
+	sprintf(byte_info, "\tbytes: %lld", tbytes);
+	strcat(info, byte_info);
+
 	if (carriage_return) {
 	  fprintf(stderr, "                                                     \r");
 	  fprintf(stderr, "%s\r", info);

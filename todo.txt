@@ -1,0 +1,4 @@
+ - tcp
+ - -f file
+ - -s size
+ - report time when transfer done

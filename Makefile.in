@@ -1,0 +1,21 @@
+CC = gcc
+CFLAGS = -W -Wall -O2
+
+pmr:	pmr.c
+	$(CC) $(CFLAGS) -o pmr pmr.c
+
+install:	pmr
+	mkdir -p {PREFIX}/bin
+	mkdir -p {PREFIX}/man/man1
+	install pmr {PREFIX}/bin/
+	install pmr.1 {PREFIX}/man/man1/
+
+test:	pmr
+	./pmr -p < /dev/zero > /dev/zero
+
+mydist:
+	mkdir -p dist
+	cp configure Makefile.in pmr.c pmr.1 dist/
+
+clean:	
+	rm -f *.o pmr

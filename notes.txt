@@ -1,0 +1,5 @@
+ M	unit size
+ bw	bandwidth
+ f	frequency
+
+ f = bw * 1s / M	=>	T = M / (bw * 1s)
