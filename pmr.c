@@ -86,7 +86,7 @@ HISTORY
 
 #include <errno.h>
 
-#define VERSION "0.08"
+#define VERSION "0.09"
 
 #define BUFFER_SIZE 8192
 
