@@ -24,23 +24,27 @@
    affect time-local bandwidth results, but not total average bandwidth
    result.
 
-   -c switch makes pmr dump total byte count when it prints bandwidth.
+   -l Bps
+      limits pipe throughput rate to 'Bps'. The unit is bytes per second.
 
-   -t switch sets how often bandwidth (and byte count) is printed. default
-      is 2 seconds.
+   -c is an obsoleted switch. no longer used.
 
-   -p switch makes pmr touch each 4k page it has read from the kernel.
+   -t secs
+      sets how often bandwidth (and byte count) is printed. default
+      is every 2 seconds.
+
+   -p makes pmr touch each 4k page it has read from the kernel.
       (effective when reading from /dev/zero with linux kernel)
 
    -b switch sets input buffer size (default 65536)
 
-   -r switch makes pmr not use newline on output, uses carriage return
+   -r makes pmr not use newline on output, uses carriage return
       instead
 
-   -v switch prints version information, author, contact email address and
+   -v prints version information, author, contact email address and
       web site
 
-   -h switch prints switches for the program
+   -h prints switches for the program
 
 HISTORY
 
@@ -299,7 +303,7 @@ int main(int argc, char **argv)
       fprintf(stderr, "pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n", VERSION);
       fprintf(stderr, "This program is public domain.\n");
       fprintf(stderr, "You can get the latest version of the program from:\n");
-      fprintf(stderr, "\n  http://ee.tut.fi/~heikki/foss/\n\n");
+      fprintf(stderr, "\n  http://ee.tut.fi/~heikki/foss/pmr/\n\n");
       return 0;
     }
     fprintf(stderr, "unknown args: %s\n", argv[i]);
