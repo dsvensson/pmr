@@ -1,7 +1,7 @@
 /* Pmr by Heikki Orsila <heikki.orsila@iki.fi> (2003.12.28)
    This source is public domain. Do what you want with it.
 
-   Get latest version of pmr from: http://ee.tut.fi/~heikki/foss
+   Get latest version of pmr from: http://www.modeemi.fi/~shd/foss/pmr/
 
    Pmr displays the bandwidth of the pipe going through the process.
 
@@ -306,7 +306,7 @@ int main(int argc, char **argv)
       fprintf(stderr, "pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n", VERSION);
       fprintf(stderr, "This program is public domain.\n");
       fprintf(stderr, "You can get the latest version of the program from:\n");
-      fprintf(stderr, "\n  http://ee.tut.fi/~heikki/foss/pmr/\n\n");
+      fprintf(stderr, "\n  http://www.modeemi.fi/~shd/foss/pmr/\n\n");
       return 0;
     }
     fprintf(stderr, "unknown args: %s\n", argv[i]);
