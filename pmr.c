@@ -88,13 +88,15 @@ static int max_rate = -1;
 static int rate_read_bytes = 0;
 struct timeval rate_time;
 
-static void sh(int sig) {
+static void sh(int sig)
+{
   sig = sig;
   end_program = 1;
 }
 
 
-static int timetest(char *s, struct timeval *ot, long long *bytes, int force) {
+static int timetest(char *s, struct timeval *ot, long long *bytes, int force)
+{
   struct timeval nt;
   int t;
   strcpy(s, "bandwidth: NaN");
@@ -214,7 +216,8 @@ int read_rate_limit(char *buf, int size)
 }
 
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   int aligned_size = BUFFER_SIZE;
   int carriage_return = 0;
   char *real_buf;
@@ -283,7 +286,7 @@ int main(int argc, char **argv) {
       continue;
     }
     if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
-      fprintf(stderr, "pipemeter %s: usage:\n\n", VERSION);
+      fprintf(stderr, "pmr %s: usage:\n\n", VERSION);
       fprintf(stderr, " %s [-t seconds] [-c] [-p] [-b size] [-r] [-h/--help] [-v]\n\n", argv[0]);
       fprintf(stderr, " -t secs\tupdate interval in seconds\n");
       fprintf(stderr, " -c\t\tprints byte count during progress\n");
@@ -294,7 +297,7 @@ int main(int argc, char **argv) {
       return 0;
     }
     if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--version")) {
-      fprintf(stderr, "pipemeter %s by Heikki Orsila <heikki.orsila@iki.fi>\n", VERSION);
+      fprintf(stderr, "pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n", VERSION);
       fprintf(stderr, "This program is public domain.\n");
       fprintf(stderr, "You can get the latest version of the program from:\n");
       fprintf(stderr, "\n  http://ee.tut.fi/~heikki/foss/\n\n");

@@ -1,0 +1,57 @@
+.TH pipemeter 1 "2004/02/27" Linux "user commands"
+
+.SH NAME
+pipemeter \- command line pipe measurement tool for Unixes
+
+.SH SYNTAX
+.B pipemeter
+[\fB-c\fR] [\fB-r\fR] [\fB-t secs\fR] [\fB-b size\fR] [\fB-v\fR]
+
+.SH VERSION
+This man page documents pipemeter version 0.06 and maybe later.
+
+.SH DESCRIPTION
+.I pipemeter
+is a command line tool to measure bandwidth and amount of bytes going through
+the pipe.
+
+.SH OPTIONS
+.TP
+.B \-c
+Display amount of bytes tranferred
+.TP
+.B \-r
+Don't print new lines on output, use carriage return
+.TP
+.BI \-t " secs"
+Display information once in every
+.I secs
+time interval
+.TP
+.BI \-b " size"
+Use input buffer size of
+.I size
+bytes
+.TP
+.B \-h
+Display help
+.TP
+.B \-v
+Display version information
+
+
+.SH EXAMPLES
+.nf
+Transfer SHELL_PATTERN files with netcat to a host:
+.ft B
+tar cvf - SHELL_PATTERN |pipemeter -c |nc host port
+
+.ft R
+Generate lots of context switches:
+.ft B
+pipemeter < /dev/zero |cat > /dev/zero
+
+
+.SH AUTHOR
+Heikki Orsila <heikki.orsila@iki.fi>
+.br
