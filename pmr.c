@@ -67,6 +67,8 @@ HISTORY
 			   another project
 			 - removed -c switch. total bytes is displayed
 			   always, and -c is preserved for compatibility.
+   20040728 version 0.08 - add -l switch to the command help (i forgot to do
+                           in 0.07)
 */
 
 #include <stdio.h>
@@ -79,7 +81,7 @@ HISTORY
 
 #include <errno.h>
 
-#define VERSION "0.07"
+#define VERSION "0.08"
 
 #define BUFFER_SIZE 8192
 
