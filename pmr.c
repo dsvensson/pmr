@@ -1,7 +1,7 @@
 /* Pmr by Heikki Orsila <heikki.orsila@iki.fi> (2003.12.28)
    This source is public domain. Do what you want with it.
 
-   Get latest version of pmr from: http://www.modeemi.fi/~shd/foss/pmr/
+   Get latest version of pmr from: http://www.iki.fi/shd/foss/pmr/
 
    Pmr displays the bandwidth of the pipe going through the process.
 
@@ -69,6 +69,10 @@ HISTORY
 			   always, and -c is preserved for compatibility.
    20040728 version 0.08 - add -l switch to the command help (i forgot to do
                            in 0.07)
+   20050219 cvs edit     - changed web site url to http://www.iki.fi/shd/\
+                           foss/pmr/, and changed printed speed units to
+                           IEC 60027-2 (2000-11) Ed. 2.0.
+			   kB => KiB, MB => MiB, GB => GiB, TB => TiB
 */
 
 #include <stdio.h>
@@ -133,16 +137,16 @@ static int timetest(char *s, struct timeval *ot, long long *bytes, int force)
 	strcpy(id, "B");
 	break;
       case 1:
-	strcpy(id, "kB");
+	strcpy(id, "KiB");
 	break;
       case 2:
-	strcpy(id, "MB");
+	strcpy(id, "MiB");
 	break;
       case 3:
-	strcpy(id, "GB");
+	strcpy(id, "GiB");
 	break;
       case 4:
-	strcpy(id, "TB");
+	strcpy(id, "TiB");
 	break;
       default:
 	fprintf(stderr, "pmr: a bug in number order!\n");
@@ -306,7 +310,7 @@ int main(int argc, char **argv)
       fprintf(stderr, "pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n", VERSION);
       fprintf(stderr, "This program is public domain.\n");
       fprintf(stderr, "You can get the latest version of the program from:\n");
-      fprintf(stderr, "\n  http://www.modeemi.fi/~shd/foss/pmr/\n\n");
+      fprintf(stderr, "\n  http://www.iki.fi/shd/foss/pmr/\n\n");
       return 0;
     }
     fprintf(stderr, "unknown args: %s\n", argv[i]);
