@@ -1,8 +1,14 @@
 CC = gcc
 CFLAGS = -W -Wall -O2
 
-pmr:	pmr.c
-	$(CC) $(CFLAGS) -o pmr pmr.c
+pmr:	pmr.o md5c.o
+	$(CC) $(CFLAGS) -o pmr pmr.o md5c.o
+
+pmr.o:	pmr.c md5.h
+	$(CC) $(CFLAGS) -c pmr.c
+
+md5c.o:	md5c.c md5.h
+	$(CC) $(CFLAGS) -c md5c.c
 
 install:	pmr
 	mkdir -p {PREFIX}/bin

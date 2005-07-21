@@ -234,6 +234,8 @@ int main(int argc, char **argv)
       fprintf(stderr, " %s [-l Bps] [-t seconds] [-p] [-b size] [-r] [-h/--help] [-v]\n\n", argv[0]);
       fprintf(stderr, " -b size\tset input buffer size (default %d)\n", BUFFER_SIZE);
       fprintf(stderr, " -l Bps\t\tlimit throughput to 'Bps' bytes per second\n");
+      fprintf(stderr, " -m / --md5\tcompute an md5 checksum of the stream (useful for verifying\n");
+      fprintf(stderr, "\t\tdata integrity through TCP networks)\n");
       fprintf(stderr, " -p\t\tenables 4k page poking (useless)\n");
       fprintf(stderr, " -r\t\tuse carriage return on output, no newline\n");
       fprintf(stderr, " -t secs\tupdate interval in seconds\n");
