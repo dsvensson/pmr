@@ -15,7 +15,7 @@ test:	pmr
 
 mydist:
 	mkdir -p dist
-	cp configure Makefile.in pmr.c pmr.1 dist/
+	cp configure Makefile.in pmr.c pmr.1 ChangeLog dist/
 
 clean:	
 	rm -f *.o pmr

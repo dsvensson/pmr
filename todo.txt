@@ -3,4 +3,5 @@
  - -s size
  - report time when transfer done
  - toggle units
+ - md5sum on session
 

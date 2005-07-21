@@ -1,79 +1,9 @@
-/* Pmr by Heikki Orsila <heikki.orsila@iki.fi> (2003.12.28)
+/* pmr by Heikki Orsila <heikki.orsila@iki.fi> (2003.12.28)
    This source is public domain. Do what you want with it.
 
    Get latest version of pmr from: http://www.iki.fi/shd/foss/pmr/
 
    Pmr displays the bandwidth of the pipe going through the process.
-
-   An example of sending data from local host to another host:
-
-     tar cvf - SHELL_PATTERN |pmr -c |nc host port
-
-   When eof is detected on the input, average bandwidth and total number of
-   bytes that have passed the pipe are printed on the stderr. Example:
-
-     $ dd if=/dev/urandom bs=1024 count=1024 |pmr > /dev/zero 
-     bandwidth: 307.35 kB/s
-     1024+0 records in
-     1024+0 records out
-     average bandwidth: 299.15 kB/s
-     total bytes: 1048576
-
-   Notice that by default bandwidth is printed every 2 seconds. -t switch
-   may be used to specify other time interval (in seconds). This will only
-   affect time-local bandwidth results, but not total average bandwidth
-   result.
-
-   -l Bps
-      limits pipe throughput rate to 'Bps'. The unit is bytes per second.
-
-   -c is an obsoleted switch. no longer used.
-
-   -t secs
-      sets how often bandwidth (and byte count) is printed. default
-      is every 2 seconds.
-
-   -p makes pmr touch each 4k page it has read from the kernel.
-      (effective when reading from /dev/zero with linux kernel)
-
-   -b switch sets input buffer size (default 65536)
-
-   -r makes pmr not use newline on output, uses carriage return
-      instead
-
-   -v prints version information, author, contact email address and
-      web site
-
-   -h prints switches for the program
-
-HISTORY
-
-   20030127 version 0.01 - just bandwidth meter with -t switch
-   200308xx version 0.02 - added -c switch, fix bugs
-   20030822 version 0.03 - allocate page aligned memory (thanks to pablo)
-                         - added -p switch (will force pipemeter to touch
-			   all 4k pages of data being read)
-   20030830 version 0.04 - fixed speed measurement bug. speeds of over 1 TB/s
-                           would have forced the process to exit
-                         - fixed indentation bug
-			 - more robustness: gettimeofday() may fail
-   20031228 version 0.05 - add -r switch to disable use of newline (use
-                           carriage return instead)
-                         - add -b switch to control input buffer size
-   20040204 version 0.06 - set default buffer size to 8kB
-   20040701 version 0.07 - add -l switch to limit speed through pipe in
-                           bytes per second
-			 - renamed pipemeter to pmr due to conflict with
-			   another project
-			 - removed -c switch. total bytes is displayed
-			   always, and -c is preserved for compatibility.
-   20040728 version 0.08 - add -l switch to the command help (i forgot to do
-                           in 0.07)
-   20050219 cvs edit     - changed web site url to http://www.iki.fi/shd/\
-                           foss/pmr/, and changed printed speed units to
-                           IEC 60027-2 (2000-11) Ed. 2.0.
-			   kB => KiB, MB => MiB, GB => GiB, TB => TiB
-   20050308 version 0.09 - edited man page.
 */
 
 #include <stdio.h>

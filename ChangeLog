@@ -1,0 +1,49 @@
+2003-01-27  Heikki Orsila <heikki.orsila@iki.fi>
+	* version 0.01
+	- just bandwidth meter with -t switch
+
+2003-08-xx  Heikki Orsila <heikki.orsila@iki.fi>
+	* version 0.02
+	- added -c switch, fix bugs
+
+2003-08-22  Heikki Orsila <heikki.orsila@iki.fi>
+	* version 0.03
+	- allocate page aligned memory (thanks to pablo)
+	- added -p switch (will force pipemeter to touch all 4k pages of data
+	  being read)
+
+2003-08-30  Heikki Orsila <heikki.orsila@iki.fi>
+	* version 0.04
+	- fixed speed measurement bug. speeds of over 1 TB/s would have
+	  forced the process to exit
+        - fixed indentation bug
+	- more robustness: gettimeofday() may fail
+
+2003-12-28  Heikki Orsila <heikki.orsila@iki.fi>
+	* version 0.05
+	- add -r switch to disable use of newline (use carriage return instead)
+	- add -b switch to control input buffer size
+
+2004-02-04  Heikki Orsila <heikki.orsila@iki.fi>
+	* version 0.06
+	- set default buffer size to 8kB
+
+2004-07-01  Heikki Orsila <heikki.orsila@iki.fi>
+	* version 0.07
+	- add -l switch to limit speed through pipe in bytes per second
+        - renamed pipemeter to pmr due to conflict with another project
+	- removed -c switch. total bytes is displayed always, and -c is
+	  preserved for compatibility.
+
+2004-07-28  Heikki Orsila <heikki.orsila@iki.fi>
+	* version 0.08
+	- add -l switch to the command help (i forgot to do in 0.07)
+
+2005-02-19  Heikki Orsila <heikki.orsila@iki.fi>
+	- changed web site url to http://www.iki.fi/shd/foss/pmr/, and changed
+	  printed speed units to IEC 60027-2 (2000-11) Ed. 2.0. kB => KiB,
+	  MB => MiB, GB => GiB, TB => TiB.
+
+2005-03-08  Heikki Orsila <heikki.orsila@iki.fi>
+	* version 0.09
+	- edited man page.

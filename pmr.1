@@ -17,11 +17,14 @@ the pipe.
 
 .SH OPTIONS
 .TP
+.BI \-h
+Display help
+.TP
 .BI \-l " Bps"
 Limit throughput to a given bytes per second rate
 .I Bps
 .TP
-.B \-r
+.BI \-r
 Don't print new lines on output, use carriage return
 .TP
 .BI \-t " secs"
@@ -29,16 +32,22 @@ Display information once in every
 .I secs
 time interval
 .TP
+.BI \-v
+Display version information
+
+.SH USELESS OPTIONS
+.TP
 .BI \-b " size"
 Use input buffer size of
 .I size
 bytes
 .TP
-.B \-h
-Display help
+.BI \-c
+Obsolete switch that is no longer used.
 .TP
-.B \-v
-Display version information
+.BI \-p
+Makes pmr touch each 4k page it has read from the kernel. Useful when
+benchmarking page copy speed with /dev/zero device.
 
 .SH EXAMPLES
 .nf
