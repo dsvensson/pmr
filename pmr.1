@@ -5,7 +5,7 @@ pmr \- command line pipe measurement tool for Unixes
 
 .SH SYNTAX
 .B pmr
-[\fB-l Bps\fR] [\fB-r\fR] [\fB-t secs\fR] [\fB-b size\fR] [\fB-v\fR]
+[\fB-l Bps\fR] [\fB-m\fR] [\fB-r\fR] [\fB-t secs\fR] [\fB-b size\fR] [\fB-v\fR]
 
 .SH VERSION
 This man page documents pmr version 0.07 and maybe later.
@@ -17,32 +17,35 @@ the pipe.
 
 .SH OPTIONS
 .TP
-.BI \-h
+.B \-h
 Display help
 .TP
-.BI \-l " Bps"
+.B \-l Bps
 Limit throughput to a given bytes per second rate
 .I Bps
 .TP
-.BI \-r
+.B \-m / \-\-md5
+Compute an md5 checksum of the stream. This is useful for verifying data integrity through TCP networks.
+.TP
+.B \-r
 Don't print new lines on output, use carriage return
 .TP
-.BI \-t " secs"
+.B \-t secs
 Display information once in every
 .I secs
 time interval
 .TP
-.BI \-v
+.B \-v
 Display version information
 
 .SH USELESS OPTIONS
 .TP
-.BI \-b " size"
+.B \-b size
 Use input buffer size of
 .I size
 bytes
 .TP
-.BI \-p
+.B \-p
 Makes pmr touch each 4k page it has read from the kernel. Useful when
 benchmarking page copy speed with /dev/zero device.
 

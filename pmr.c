@@ -17,7 +17,7 @@
 
 #include "md5.h"
 
-#define VERSION "0.09"
+#define VERSION "0.10"
 
 #define BUFFER_SIZE 8192
 

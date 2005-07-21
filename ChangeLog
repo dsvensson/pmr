@@ -1,9 +1,13 @@
 2005-07-21  Heikki Orsila <heikki.orsila@iki.fi>
+	* version 0.10
 	- Started keeping ChangeLog file, and moved history information from
 	  pmr.c to this file.
 	- Removed useless documentation from pmr.c.
 	- Edited man-page to be more readable.
 	- Removed everything about -c switch.
+	- Added -m / --md5 switch that computes an md5 checksum of the stream.
+	  This is useful for verifying data integrity through TCP networks.
+	  Thanks to Ave for the idea.
 
 2005-03-08  Heikki Orsila <heikki.orsila@iki.fi>
 	* version 0.09
