@@ -215,33 +215,27 @@ int main(int argc, char **argv)
       i++;
       continue;
     }
-    if (!strcmp(argv[i], "-c")) {
-      fprintf(stderr, "pmr: -c has no effect anymore (since version 0.07). do not use it!\n");
-      i++;
-      continue;
-    }
     if (!strcmp(argv[i], "-p")) {
       poke_mem = 1;
       i++;
       continue;
     }
     if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
-      fprintf(stderr, "pmr %s: usage:\n\n", VERSION);
-      fprintf(stderr, " %s [-l Bps] [-t seconds] [-c] [-p] [-b size] [-r] [-h/--help] [-v]\n\n", argv[0]);
-      fprintf(stderr, " -l Bps\t\tlimit throughput to 'Bps' bytes per second\n");
-      fprintf(stderr, " -t secs\tupdate interval in seconds\n");
-      fprintf(stderr, " -c\t\tprints byte count during progress\n");
-      fprintf(stderr, " -p\t\tenables 4k page poking (useless)\n");
-      fprintf(stderr, " -b size\tset input buffer size (default %d)\n", BUFFER_SIZE);
-      fprintf(stderr, " -r\t\tuse carriage return on output, no newline\n");
-      fprintf(stderr, " -v\t\tprint version, about, contact and home page information\n");
+      printf("pmr %s: usage:\n\n", VERSION);
+      printf(" %s [-l Bps] [-t seconds] [-p] [-b size] [-r] [-h/--help] [-v]\n\n", argv[0]);
+      printf(" -b size\tset input buffer size (default %d)\n", BUFFER_SIZE);
+      printf(" -l Bps\t\tlimit throughput to 'Bps' bytes per second\n");
+      printf(" -p\t\tenables 4k page poking (useless)\n");
+      printf(" -r\t\tuse carriage return on output, no newline\n");
+      printf(" -t secs\tupdate interval in seconds\n");
+      printf(" -v\t\tprint version, about, contact and home page information\n");
       return 0;
     }
     if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--version")) {
-      fprintf(stderr, "pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n", VERSION);
-      fprintf(stderr, "This program is public domain.\n");
-      fprintf(stderr, "You can get the latest version of the program from:\n");
-      fprintf(stderr, "\n  http://www.iki.fi/shd/foss/pmr/\n\n");
+      printf("pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n", VERSION);
+      printf("This program is public domain.\n");
+      printf("You can get the latest version of the program from:\n");
+      printf("\n  http://www.iki.fi/shd/foss/pmr/\n\n");
       return 0;
     }
     fprintf(stderr, "unknown args: %s\n", argv[i]);
