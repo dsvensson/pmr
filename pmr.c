@@ -13,8 +13,9 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/time.h>
-
 #include <errno.h>
+
+#include "md5.h"
 
 #define VERSION "0.09"
 
@@ -28,6 +29,7 @@ static int default_interval = 2000;
 static int max_rate = -1;
 static int rate_read_bytes = 0;
 struct timeval rate_time;
+
 
 static void sh(int sig)
 {
@@ -172,6 +174,8 @@ int main(int argc, char **argv)
   char info[256];
   int valid_time = 1;
   int (*read_function)(char *buf, int size) = read_no_rate_limit;
+  int use_md5 = 0;
+  MD5_CTX md5ctx;
 
   for (i = 1; i < argc;) {
     if (!strcmp(argv[i], "-t")) {
@@ -209,7 +213,12 @@ int main(int argc, char **argv)
       i += 2;
       continue;
     }
-
+    if (!strcmp(argv[i], "-m") || !strcmp(argv[i], "--md5")) {
+      use_md5 = 1;
+      MD5Init(&md5ctx);
+      i++;
+      continue;
+    }
     if (!strcmp(argv[i], "-r")) {
       carriage_return = 1;
       i++;
@@ -306,6 +315,10 @@ int main(int argc, char **argv)
 	  }
 	}
       }
+
+      if (use_md5)
+	MD5Update(&md5ctx, (unsigned char *) aligned_buf, rbytes);
+
       if (valid_time && timetest(info, &ot, &wbytes, 0)) {
 	char byte_info[256];
 	sprintf(byte_info, "\tbytes: %lld", tbytes);
@@ -331,10 +344,15 @@ int main(int argc, char **argv)
 
   do {
     long long bytes = tbytes;
+    unsigned char md5[16];
     timetest(info, &vot, &bytes, 1);
     fprintf(stderr, "                                                     \r");
     fprintf(stderr, "average %s\n", info);
     fprintf(stderr, "total bytes: %lld\n", tbytes);
+    if (use_md5) {
+      MD5Final(md5, &md5ctx);
+      fprintf(stderr, "md5sum: %.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x\n",md5[0],md5[1],md5[2],md5[3],md5[4],md5[5],md5[6],md5[7],md5[8],md5[9],md5[10],md5[11],md5[12],md5[13],md5[14],md5[15]);
+    }
   } while (0);
 
   free(real_buf);
