@@ -38,7 +38,7 @@ static void sh(int sig)
 }
 
 
-static int timetest(char *s, struct timeval *ot, long long *bytes, int force)
+static int timetest(char *s, size_t maxlen, struct timeval *ot, long long *bytes, int force)
 {
   struct timeval nt;
   int t;
@@ -86,7 +86,7 @@ static int timetest(char *s, struct timeval *ot, long long *bytes, int force)
 	strcpy(id, "Strange Unit");
 	break;
       }
-      sprintf(s, "bandwidth: %.2f %s/s", bw, id);
+      snprintf(s, maxlen, "bandwidth: %.2f %s/s", bw, id);
     }
     *ot = nt;
     *bytes = 0;
@@ -321,9 +321,9 @@ int main(int argc, char **argv)
       if (use_md5)
 	MD5Update(&md5ctx, (unsigned char *) aligned_buf, rbytes);
 
-      if (valid_time && timetest(info, &ot, &wbytes, 0)) {
+      if (valid_time && timetest(info, sizeof(info), &ot, &wbytes, 0)) {
 	char byte_info[256];
-	sprintf(byte_info, "\tbytes: %lld", tbytes);
+	snprintf(byte_info, sizeof(byte_info), "\tbytes: %lld", tbytes);
 	strcat(info, byte_info);
 
 	if (carriage_return) {
@@ -347,7 +347,7 @@ int main(int argc, char **argv)
   do {
     long long bytes = tbytes;
     unsigned char md5[16];
-    timetest(info, &vot, &bytes, 1);
+    timetest(info, sizeof(info), &vot, &bytes, 1);
     fprintf(stderr, "                                                     \r");
     fprintf(stderr, "average %s\n", info);
     fprintf(stderr, "total bytes: %lld\n", tbytes);

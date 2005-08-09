@@ -1,3 +1,8 @@
+2005-08-09  Heikki Orsila <heikki.orsila@iki.fi>
+	- Changed sprintf() to snprintf() in timetest() to shut up an OpenBSD
+	  compiler. The program wasn't faulty, but an OpenLSD compiler is
+	  paranoid.
+
 2005-07-21  Heikki Orsila <heikki.orsila@iki.fi>
 	* version 0.10
 	- Started keeping ChangeLog file, and moved history information from
