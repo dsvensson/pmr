@@ -324,13 +324,15 @@ int main(int argc, char **argv)
       if (valid_time && timetest(info, sizeof(info), &ot, &wbytes, 0)) {
 	char byte_info[256];
 	snprintf(byte_info, sizeof(byte_info), "\tbytes: %lld", tbytes);
-	strcat(info, byte_info);
-
-	if (carriage_return) {
-	  fprintf(stderr, "                                                     \r");
-	  fprintf(stderr, "%s\r", info);
-	} else {
-	  fprintf(stderr, "%s\n", info);
+	/* A check for just being pedantic. info[] is long enough always. */
+	if ((strlen(info) + strlen(byte_info) + 1) <= sizeof(info)) {
+	  strcat(info, byte_info);
+	  if (carriage_return) {
+	    fprintf(stderr, "                                                     \r");
+	    fprintf(stderr, "%s\r", info);
+	  } else {
+	    fprintf(stderr, "%s\n", info);
+	  }
 	}
       }
 
