@@ -12,9 +12,9 @@ for opt in "$@" ; do
 		;;
 	--help)
 		echo ""
-		echo "valid options are:"
-		echo "--prefix dir           install pipemeter to prefix 'dir'"
- 		echo "--package-prefix dest  pretend to install to the prefix,"
+		echo "Valid options are:"
+		echo "--prefix=dir           Install pipemeter to prefix 'dir'"
+ 		echo "--package-prefix=dest  Pretend to install to the prefix,"
 		echo "                       but copy files to 'dest/prefix' on make install"
 		exit
 		;;
