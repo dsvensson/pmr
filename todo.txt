@@ -4,4 +4,6 @@
  - report time when transfer done
  - toggle units
  - md5sum on session
+ - ability use units with -l (pmr -l 1.1MiB)
+
 

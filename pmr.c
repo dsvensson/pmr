@@ -38,6 +38,34 @@ static void sh(int sig)
 }
 
 
+static void sizetransformation(double *size, char *unit, double srcsize)
+{
+  const char *units[9] = {"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB",
+			  "YiB"};
+  int order = 0;
+  if (srcsize < 0) {
+    fprintf(stderr, "pmr bug: negative size\n");
+    *size = 0;
+    strcpy(unit, "B");
+    return;
+  }
+  while (srcsize >= 1024.0f) {
+    srcsize /= 1024.0f;
+    order++;
+  }
+
+  if (order >= (int) (sizeof(units) / sizeof(units[0]))) {
+    fprintf(stderr, "pmr bug: too high number order\n");
+    *size = 0;
+    strcpy(unit, "B");
+    return;
+  }
+
+  *size = srcsize;
+  strcpy(unit, units[order]);
+}
+
+
 static int timetest(char *s, size_t maxlen, struct timeval *ot, long long *bytes, int force)
 {
   struct timeval nt;
@@ -53,39 +81,10 @@ static int timetest(char *s, size_t maxlen, struct timeval *ot, long long *bytes
     t = default_interval + 1;
   }
   if (t > default_interval || force) {
-    int order;
-    double bw;
-    char id[256];
     if (t) {
-      bw = ((double) *bytes) * 1000.0f / ((double) t);
-      order = 0;
-      while (bw >= 1024.0f) {
-	bw /= 1024.0f;
-	order++;
-	if (order == 4)
-	  break;
-      }
-      switch (order) {
-      case 0:
-	strcpy(id, "B");
-	break;
-      case 1:
-	strcpy(id, "KiB");
-	break;
-      case 2:
-	strcpy(id, "MiB");
-	break;
-      case 3:
-	strcpy(id, "GiB");
-	break;
-      case 4:
-	strcpy(id, "TiB");
-	break;
-      default:
-	fprintf(stderr, "pmr: a bug in number order!\n");
-	strcpy(id, "Strange Unit");
-	break;
-      }
+      double bw;
+      char id[16];
+      sizetransformation(&bw, id, ((double) *bytes) * 1000.0f / t);
       snprintf(s, maxlen, "bandwidth: %.2f %s/s", bw, id);
     }
     *ot = nt;
@@ -310,7 +309,7 @@ int main(int argc, char **argv)
 	  end_program = 1;
 	  break;
 	} else if (ret < 0) {
-	  if (errno != EINTR) { 
+	  if (errno != EINTR) {
 	    perror("pmr: write error");
 	    end_program = 1;
 	    break;
@@ -323,7 +322,11 @@ int main(int argc, char **argv)
 
       if (valid_time && timetest(info, sizeof(info), &ot, &wbytes, 0)) {
 	char byte_info[256];
-	snprintf(byte_info, sizeof(byte_info), "\tbytes: %lld", tbytes);
+	char unit[16];
+	double total;
+	sizetransformation(&total, unit, tbytes);
+	snprintf(byte_info, sizeof byte_info, "\ttotal: %.2f %s (%lld bytes)", total, unit, tbytes);
+
 	/* A check for just being pedantic. info[] is long enough always. */
 	if ((strlen(info) + strlen(byte_info) + 1) <= sizeof(info)) {
 	  strcat(info, byte_info);
@@ -349,10 +352,15 @@ int main(int argc, char **argv)
   do {
     long long bytes = tbytes;
     unsigned char md5[16];
+    double total;
+    char unit[16];
+
     timetest(info, sizeof(info), &vot, &bytes, 1);
     fprintf(stderr, "                                                     \r");
     fprintf(stderr, "average %s\n", info);
-    fprintf(stderr, "total bytes: %lld\n", tbytes);
+
+    sizetransformation(&total, unit, tbytes);
+    fprintf(stderr, "total: %.2f %s (%lld bytes)\n", total, unit, tbytes);
     if (use_md5) {
       MD5Final(md5, &md5ctx);
       fprintf(stderr, "md5sum: %.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x\n",md5[0],md5[1],md5[2],md5[3],md5[4],md5[5],md5[6],md5[7],md5[8],md5[9],md5[10],md5[11],md5[12],md5[13],md5[14],md5[15]);

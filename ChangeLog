@@ -1,3 +1,12 @@
+2005-12-26  Heikki Orsila <heikki.orsila@iki.fi>
+	- Added size units to display total bytes. It is more human-readable
+	  to display 14.31 MiB rather than 15000000 bytes. Thanks to Al Piszcz
+	  for suggesting this feature.
+	- Note: you may access the pmr CVS by:
+	  cvs -d :pserver:uadecvs@zakalwe.virtuaalipalvelin.net:/home/uade-cvsroot login
+	  <password is uadecvs>
+	  cvs -d :pserver:uadecvs@zakalwe.virtuaalipalvelin.net:/home/uade-cvsroot co pmr
+
 2005-08-09  Heikki Orsila <heikki.orsila@iki.fi>
 	- Changed sprintf() to snprintf() in timetest() to shut up an OpenBSD
 	  compiler. The program wasn't faulty, but an OpenLSD compiler is

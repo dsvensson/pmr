@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -W -Wall -O2
+CFLAGS = -Wall -O2
 
 pmr:	pmr.o md5c.o
 	$(CC) $(CFLAGS) -o pmr pmr.o md5c.o
@@ -16,8 +16,10 @@ install:	pmr
 	install pmr {PREFIX}/bin/
 	install pmr.1 {PREFIX}/man/man1/
 
-test:	pmr
-	./pmr -p < /dev/zero > /dev/zero
+check:	pmr
+	@echo "This is not a test."
+	@echo
+	dd if=/dev/zero bs=1000000 count=15 |./pmr -l 1000000 > /dev/zero
 
 mydist:
 	mkdir -p dist
