@@ -1,11 +1,21 @@
 2005-12-26  Heikki Orsila <heikki.orsila@iki.fi>
+	* version 0.11
 	- Added size units to display total bytes. It is more human-readable
 	  to display 14.31 MiB rather than 15000000 bytes. Thanks to Al Piszcz
 	  for suggesting this feature.
-	- Note: you may access the pmr CVS by:
+	- Note: you may access the pmr CVS repository by:
 	  cvs -d :pserver:uadecvs@zakalwe.virtuaalipalvelin.net:/home/uade-cvsroot login
 	  <password is uadecvs>
 	  cvs -d :pserver:uadecvs@zakalwe.virtuaalipalvelin.net:/home/uade-cvsroot co pmr
+	- It is now possible to specify throughtput limit in SI, IEC 60027
+	  and bit units. Valid IEC 60027 units (base 2) are:
+	    B, KiB, MiB, GiB, TiB, PiB, EiB, ZiB and YiB
+	  Valid SI units (base 10) are:
+	    B, kB, MB, GB, TB, PB, EB, ZB and YB
+	  Valid bit units are:
+	    b, kbit, Mbit, GBit, Tbit, Pbit, Ebit, Zbit and Ybit.
+	  An example:
+	    tar cvf - *FILES* |pmr -l 256kbits |nc host port
 
 2005-08-09  Heikki Orsila <heikki.orsila@iki.fi>
 	- Changed sprintf() to snprintf() in timetest() to shut up an OpenBSD
