@@ -17,7 +17,7 @@
 
 #include "md5.h"
 
-#define VERSION "0.10"
+#define VERSION "0.11"
 
 #define BUFFER_SIZE 8192
 
@@ -38,7 +38,56 @@ static void sh(int sig)
 }
 
 
-static void sizetransformation(double *size, char *unit, double srcsize)
+static double inverse_size_transformation(const char *valuestr)
+{
+  char *endptr;
+  double value;
+
+#define NUNITS (9)
+  const char *iec_units[NUNITS] = {"B", "KiB", "MiB", "GiB", "TiB", "PiB",
+				   "EiB", "ZiB", "YiB"};
+  const char *si_byte_units[NUNITS] = {"B", "kB", "MB", "GB", "TB", "PB", "EB",
+				       "ZB", "YB"};
+  const char *si_bit_units[NUNITS] = {"b", "kbit", "Mbit", "Gbit", "Tbit",
+				      "Pbit", "Ebit", "Zbit", "Ybit"};
+
+
+  double multiplier;
+  int i;
+
+  value = strtod(valuestr, &endptr);
+  if (*endptr == 0)
+    return value;
+
+  multiplier = 1.0;
+  for (i = 0; i < NUNITS; i++) {
+    if (strncmp(endptr, iec_units[i], 2) == 0)
+      return multiplier * value;
+    multiplier *= 1024.0;
+  }
+
+
+  multiplier = 1.0;
+  for (i = 0; i < NUNITS; i++) {
+    if (strncmp(endptr, si_byte_units[i], 2) == 0)
+      return multiplier * value;
+    multiplier *= 1000.0;
+  }
+
+  multiplier = 1.0 / 8;
+  for (i = 0; i < NUNITS; i++) {
+    if (strncmp(endptr, si_bit_units[i], 2) == 0)
+      return multiplier * value;
+    multiplier *= 1000.0;
+  }
+
+  fprintf(stderr, "pmr error: unknown unit: %s\n", endptr);
+  exit(-1);
+  return 0.0;
+}
+
+
+static void size_transformation(double *size, char *unit, double srcsize)
 {
   const char *units[9] = {"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB",
 			  "YiB"};
@@ -84,7 +133,7 @@ static int timetest(char *s, size_t maxlen, struct timeval *ot, long long *bytes
     if (t) {
       double bw;
       char id[16];
-      sizetransformation(&bw, id, ((double) *bytes) * 1000.0f / t);
+      size_transformation(&bw, id, ((double) *bytes) * 1000.0f / t);
       snprintf(s, maxlen, "bandwidth: %.2f %s/s", bw, id);
     }
     *ot = nt;
@@ -199,11 +248,15 @@ int main(int argc, char **argv)
     }
     if (!strcmp(argv[i], "-l")) {
       if ((i + 1) < argc) {
-        max_rate = atoi(argv[i + 1]);
-	if (max_rate <= 0) {
-	  fprintf (stderr, "illegal bytes per second value (%d)\n", max_rate);
+	double value = inverse_size_transformation(argv[i + 1]);
+	if (value <= 0) {
+	  fprintf (stderr, "illegal bytes per second value (%s)\n", argv[i + 1]);
+	  return -1;
+	} else if (value >= 2147483648UL) {
+	  fprintf(stderr, "too high bytes per second value (%s)\n", argv[i + 1]);
 	  return -1;
 	}
+        max_rate = value;
 	read_function = read_rate_limit;
       } else {
         fprintf (stderr, "expecting a value for bandwidth limit (bytes per second)\n");
@@ -229,16 +282,19 @@ int main(int argc, char **argv)
       continue;
     }
     if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
-      fprintf(stderr, "pmr %s: usage:\n\n", VERSION);
+      fprintf(stderr, "pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n\nUsage:\n\n", VERSION);
       fprintf(stderr, " %s [-l Bps] [-t seconds] [-p] [-b size] [-r] [-h/--help] [-v]\n\n", argv[0]);
       fprintf(stderr, " -b size\tset input buffer size (default %d)\n", BUFFER_SIZE);
-      fprintf(stderr, " -l Bps\t\tlimit throughput to 'Bps' bytes per second\n");
-      fprintf(stderr, " -m / --md5\tcompute an md5 checksum of the stream (useful for verifying\n");
+      fprintf(stderr, " -l Bps\t\tLimit throughput to 'Bps' bytes per second. It is also\n");
+      fprintf(stderr, "\t\tpossible to use SI, IEC 60027 and bit units in the value.\n");
+      fprintf(stderr, "\t\tSI units include kB, MB, ..., IEC units include KiB, MiB, ...\n");
+      fprintf(stderr, "\t\tand bit units include kbit, Mbit, ...\n");
+      fprintf(stderr, " -m / --md5\tCompute an md5 checksum of the stream (useful for verifying\n");
       fprintf(stderr, "\t\tdata integrity through TCP networks)\n");
-      fprintf(stderr, " -p\t\tenables 4k page poking (useless)\n");
-      fprintf(stderr, " -r\t\tuse carriage return on output, no newline\n");
-      fprintf(stderr, " -t secs\tupdate interval in seconds\n");
-      fprintf(stderr, " -v\t\tprint version, about, contact and home page information\n");
+      fprintf(stderr, " -p\t\tEnables 4k page poking (useless)\n");
+      fprintf(stderr, " -r\t\tUse carriage return on output, no newline\n");
+      fprintf(stderr, " -t secs\tUpdate interval in seconds\n");
+      fprintf(stderr, " -v\t\tPrint version, about, contact and home page information\n");
       return 0;
     }
     if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--version")) {
@@ -324,7 +380,7 @@ int main(int argc, char **argv)
 	char byte_info[256];
 	char unit[16];
 	double total;
-	sizetransformation(&total, unit, tbytes);
+	size_transformation(&total, unit, tbytes);
 	snprintf(byte_info, sizeof byte_info, "\ttotal: %.2f %s (%lld bytes)", total, unit, tbytes);
 
 	/* A check for just being pedantic. info[] is long enough always. */
@@ -359,7 +415,7 @@ int main(int argc, char **argv)
     fprintf(stderr, "                                                     \r");
     fprintf(stderr, "average %s\n", info);
 
-    sizetransformation(&total, unit, tbytes);
+    size_transformation(&total, unit, tbytes);
     fprintf(stderr, "total: %.2f %s (%lld bytes)\n", total, unit, tbytes);
     if (use_md5) {
       MD5Final(md5, &md5ctx);
