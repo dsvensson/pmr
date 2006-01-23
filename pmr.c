@@ -13,6 +13,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <errno.h>
 
 #include "md5.h"
@@ -365,8 +366,21 @@ int main(int argc, char **argv)
 	  end_program = 1;
 	  break;
 	} else if (ret < 0) {
-	  if (errno != EINTR) {
-	    perror("pmr: write error");
+	  if (errno == EINTR) {
+	    continue;
+	  } else if (errno == EAGAIN) {
+	    fd_set wfds;
+	    FD_ZERO(&wfds);
+	    FD_SET(1, &wfds);
+	    if (select(2, NULL, &wfds, NULL, NULL) < 0) {
+	      if (errno != EINTR) {
+		fprintf(stderr, "Write select error: %s\n", strerror(errno));
+		end_program = 1;
+		break;
+	      }
+	    }
+	  } else {
+	    perror("pmr: Write error");
 	    end_program = 1;
 	    break;
 	  }
@@ -398,8 +412,18 @@ int main(int argc, char **argv)
     } else if (ret == 0) {
       end_program = 1;
     } else {
-      if (errno != EINTR) {
-	perror("pmr: read error");
+      if (errno == EAGAIN) {
+	fd_set rfds;
+	FD_ZERO(&rfds);
+	FD_SET(0, &rfds);
+	if (select(1, &rfds, NULL, NULL, NULL)) {
+	  if (errno != EINTR) {
+	    fprintf(stderr, "Read select error: %s\n", strerror(errno));
+	    end_program = 1;
+	  }
+	}
+      } else if (errno != EINTR) {
+	perror("pmr: Read error");
 	end_program = 1;
       }
     }

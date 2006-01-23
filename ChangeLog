@@ -1,3 +1,8 @@
+2006-01-23  Heikki Orsila <heikki.orsila@iki.fi>
+	- Added support for non-blocking I/O if someone needs it. No practical
+	  circumstance has ever come up. If it had, the pmr would have exited
+	  with error indicating the reason.
+
 2006-01-01  Heikki Orsila <heikki.orsila@iki.fi>
 	* version 0.11
 	- Added size units to display total bytes. It is more human-readable
