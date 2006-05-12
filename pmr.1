@@ -22,7 +22,10 @@ Display help
 .TP
 .B \-l Bps
 Limit throughput to a given bytes per second rate
-.I Bps
+.I Bps .
+One can use IEC 60027-2 standard specified scalers for these numbers.
+KiB = 1024, MiB = 1024^2, ..., kB = 1000, MB = 10^6, ... An example:
+pmr -l 64KiB < /dev/zero > /dev/null
 .TP
 .B \-m / \-\-md5
 Compute an md5 checksum of the stream. This is useful for verifying data integrity through TCP networks.
