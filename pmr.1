@@ -5,16 +5,20 @@ pmr \- command line pipe measurement tool for Unixes
 
 .SH SYNTAX
 .B pmr
-[\fB-l Bps\fR] [\fB-m\fR] [\fB-r\fR] [\fB-t secs\fR] [\fB-b size\fR] [\fB-v\fR]
+[\fB-l Bps\fR] [\fB-s size\fR] [\fB-m\fR] [\fB-r\fR] [\fB-t secs\fR] [\fB-b size\fR] [\fB-v\fR] FILE ...
 
 .SH VERSION
-This man page documents pmr version 0.07 and maybe later.
+This man page documents pmr version 0.12 and maybe later.
 
 .SH DESCRIPTION
 .I pmr
 is a command line tool to measure bandwidth and amount of bytes going through
 a command line pipe. It can also be used to limit pipe throughput in
-terms of bytes per second and compute md5sums of streams.
+bytes per second, compute an md5sum of the stream and compute
+an ETA for completion.
+
+If regular files are given as parameters, they are concatenated to the
+standard output and an ETA is computed based on the total size of the files.
 
 .SH OPTIONS
 .TP
@@ -37,6 +41,10 @@ Compute an md5 checksum of the stream. This is useful for verifying data integri
 .TP
 .B \-r
 Don't print new lines on output, use carriage return
+.TP
+.B \-s size
+Calculate ETA given a size estimate. Giving regular files as pmr parameters
+implies -s SUM, where SUM is the total size of those files.
 .TP
 .B \-t secs
 Display information once in every

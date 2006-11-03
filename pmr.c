@@ -14,13 +14,42 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <errno.h>
+#include <assert.h>
 
 #include "md5.h"
 
-#define VERSION "0.11"
+
+#define darray_append(n, nallocated, array, item) do { \
+    assert((n) >= 0); \
+    assert((nallocated) >= 0); \
+    assert((n) <= (nallocated)); \
+                                 \
+    if ((n) == (nallocated)) { \
+      if ((nallocated) == 0) \
+        (nallocated) = 1; \
+      (nallocated) *= 2; \
+      assert((nallocated) > 0); \
+      (array) = realloc((array), (nallocated) * sizeof((array)[0])); \
+      if ((array) == NULL) { \
+        fprintf(stderr, "no memory for darray elements\n"); \
+        exit(-1); \
+      } \
+    } \
+      \
+    (array)[(n)] = (item); \
+    (n)++; \
+  } while (0)
+
+
+#define VERSION "0.12"
 
 #define BUFFER_SIZE 8192
+
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 8192
+#endif
 
 extern int errno;
 
@@ -32,6 +61,55 @@ static int default_interval = 2000;
 static int max_rate = -1;
 static int rate_read_bytes = 0;
 struct timeval rate_time;
+
+static int input_fd;
+static size_t n_files;
+static size_t n_files_read;
+static size_t n_files_allocated;
+static char **files;
+static long long estimatedbytes;
+
+#define SPEED_WINDOW_SIZE 3
+static double speed_window[SPEED_WINDOW_SIZE];
+
+
+static void append_eta(char *info, double bw, long long tbytes)
+{
+  int i;
+  double sum = 0.0;
+  int nvalid = 0;
+  long long bytesleft;
+  char str[256];
+
+  /* Compute a speed estimate. The estimate is an average of N previous
+     speeds. */
+  for (i = 1; i < SPEED_WINDOW_SIZE; i++) {
+    double s = speed_window[i - 1];
+    speed_window[i] = s;
+    sum += s;
+    if (s > 0.0)
+      nvalid++;
+  }
+
+  speed_window[0] = bw;
+  sum += bw;
+  if (bw > 0.0)
+    nvalid++;
+
+  if (nvalid == 0)
+    return;
+
+  bytesleft = estimatedbytes - tbytes;
+  if (bytesleft < 0) {
+    sprintf(str, "\tETA: -");
+  } else {
+    double eta = bytesleft / (sum / nvalid);
+
+    sprintf(str, "\tETA: %.1fs", eta);
+  }
+
+  strcat(info, str);
+}
 
 
 static void ctrlc_handler(int sig)
@@ -91,6 +169,27 @@ static double inverse_size_transformation(const char *valuestr)
 }
 
 
+static int open_new_file(void)
+{
+  char *fname;
+
+  close(input_fd);
+
+  if (n_files_read == n_files)
+    return 0;
+
+  fname = files[n_files_read++];
+
+  input_fd = open(fname, O_RDONLY);
+  if (input_fd < 0) {
+    fprintf(stderr, "Error opening file %s: %s\n", fname, strerror(errno));
+    exit(-1);
+  }
+
+  return 1;
+}
+
+
 static void size_transformation(double *size, char *unit, double srcsize)
 {
   const char *units[9] = {"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB",
@@ -119,10 +218,14 @@ static void size_transformation(double *size, char *unit, double srcsize)
 }
 
 
-static int timetest(char *s, size_t maxlen, struct timeval *ot, long long *bytes, int force)
+static int timetest(double *bw, char *s, size_t maxlen,
+		    struct timeval *ot, long long *bytes, int force)
 {
   struct timeval nt;
   int t;
+
+  *bw = 0.0;
+
   strcpy(s, "bandwidth: NaN");
   if (gettimeofday(&nt, 0)) {
     /* time failed. bandwidth = NaN. return false. */
@@ -135,10 +238,15 @@ static int timetest(char *s, size_t maxlen, struct timeval *ot, long long *bytes
   }
   if (t > default_interval || force) {
     if (t) {
-      double bw;
+      double canonical_bw, real_bw;
       char id[16];
-      size_transformation(&bw, id, ((double) *bytes) * 1000.0f / t);
-      snprintf(s, maxlen, "bandwidth: %.2f %s/s", bw, id);
+
+      real_bw = (1000.0 * (*bytes)) / t;
+
+      *bw = real_bw;
+
+      size_transformation(&canonical_bw, id, real_bw);
+      snprintf(s, maxlen, "bandwidth: %.2f %s/s", canonical_bw, id);
     }
     *ot = nt;
     *bytes = 0;
@@ -148,12 +256,12 @@ static int timetest(char *s, size_t maxlen, struct timeval *ot, long long *bytes
 }
 
 
-static int wait_stdin(void)
+static int wait_input(void)
 {
   fd_set rfds;
   FD_ZERO(&rfds);
-  FD_SET(0, &rfds);
-  if (select(1, &rfds, NULL, NULL, NULL) < 0) {
+  FD_SET(input_fd, &rfds);
+  if (select(input_fd + 1, &rfds, NULL, NULL, NULL) < 0) {
     if (errno != EINTR) {
       fprintf(stderr, "Read select error: %s\n", strerror(errno));
       return -1;
@@ -165,7 +273,7 @@ static int wait_stdin(void)
 
 int read_no_rate_limit(char *buf, int size)
 {
-  return read(0, buf, size);
+  return read(input_fd, buf, size);
 }
 
 int read_rate_limit(char *buf, int size)
@@ -215,7 +323,7 @@ int read_rate_limit(char *buf, int size)
 
   while (read_bytes < to_read) {
 
-    ret = read(0, buf + read_bytes , to_read - read_bytes);
+    ret = read(input_fd, buf + read_bytes , to_read - read_bytes);
 
     if (ret > 0) {
       read_bytes += ret;
@@ -259,8 +367,9 @@ int main(int argc, char **argv)
 
   struct timeval ot, vot;
   int i, ret, readoffs, rbytes;
-  long long wbytes;
-  long long tbytes;
+  long long tbytes, wbytes;
+  double bw;
+
   int poke_mem = 0;
   int valid_time = 1;
   int (*read_function)(char *buf, int size) = read_no_rate_limit;
@@ -269,7 +378,37 @@ int main(int argc, char **argv)
 
   char info[256];
 
+  int no_options = 0;
+
+  double presize = 0.0;
+
   for (i = 1; i < argc;) {
+
+    if (no_options || argv[i][0] != '-') {
+
+      char *fname = argv[i];
+      struct stat st;
+
+      if (stat(fname, &st)) {
+	fprintf(stderr, "%s can not be read: %s\n", fname, strerror(errno));
+	exit(-1);
+      }
+
+      if (!S_ISREG(st.st_mode)) {
+	fprintf(stderr, "One of the files is not a regular file -> no ETA estimation\n");
+	estimatedbytes = -1;
+      }
+
+      if (estimatedbytes >= 0)
+	estimatedbytes += st.st_size;
+
+      darray_append(n_files, n_files_allocated, files, fname);
+
+      no_options = 1;
+      i++;
+      continue;
+    }
+
     if (!strcmp(argv[i], "-t")) {
       if ((i + 1) < argc) {
 	default_interval = 1000 * atoi(argv[i + 1]);
@@ -320,6 +459,19 @@ int main(int argc, char **argv)
       i++;
       continue;
     }
+    if (!strcmp(argv[i], "-s")) {
+      if ((i + 1) >= argc) {
+	fprintf(stderr, "Not enough args. Missing size estimate.\n");
+	exit(-1);
+      }
+      presize = inverse_size_transformation(argv[i + 1]);
+      if (presize < 0.0) {
+	fprintf(stderr, "Braindamaged size estimate: %f.\n", presize);
+	presize = 0.0;
+      }
+      i += 2;
+      continue;
+    }
     if (!strcmp(argv[i], "-p")) {
       poke_mem = 1;
       i++;
@@ -328,7 +480,7 @@ int main(int argc, char **argv)
 
     if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
       fprintf(stderr, "pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n\nUsage:\n\n", VERSION);
-      fprintf(stderr, " %s [-l Bps] [-t seconds] [-p] [-b size] [-r] [-h/--help] [-v]\n\n", argv[0]);
+      fprintf(stderr, " %s [-l Bps] [-s size] [-m] [-t seconds] [-p] [-b size] [-r] [-v] FILE ...\n\n", argv[0]);
       fprintf(stderr, " -b size\tset input buffer size (default %d)\n", BUFFER_SIZE);
       fprintf(stderr, " -l Bps\t\tLimit throughput to 'Bps' bytes per second. It is also\n");
       fprintf(stderr, "\t\tpossible to use SI, IEC 60027 and bit units in the value.\n");
@@ -338,6 +490,9 @@ int main(int argc, char **argv)
       fprintf(stderr, "\t\tdata integrity through TCP networks)\n");
       fprintf(stderr, " -p\t\tEnables 4k page poking (useless)\n");
       fprintf(stderr, " -r\t\tUse carriage return on output, no newline\n");
+      fprintf(stderr, " -s size\tCalculate ETA given a size estimate. Giving regular files\n");
+      fprintf(stderr, "\t\tas pmr parameters implies -s SUM, where SUM is the total\n");
+      fprintf(stderr, "\t\tsize of those files.\n");
       fprintf(stderr, " -t secs\tUpdate interval in seconds\n");
       fprintf(stderr, " -v\t\tPrint version, about, contact and home page information\n");
       return 0;
@@ -351,13 +506,18 @@ int main(int argc, char **argv)
       return 0;
     }
 
+    if (!strcmp(argv[i], "--")) {
+      no_options = 1;
+      i++;
+      continue;
+    }
+
     fprintf(stderr, "unknown args: %s\n", argv[i]);
     return -1;
   }
 
-#ifndef PAGE_SIZE
-#define PAGE_SIZE 8192
-#endif
+  if (presize > 0.0)
+    estimatedbytes = presize;
 
   /* get page size aligned buffer of size 'aligned_size' */
   real_buf = malloc(aligned_size + PAGE_SIZE);
@@ -381,6 +541,9 @@ int main(int argc, char **argv)
 
   wbytes = 0;
   tbytes = 0;
+
+  if (n_files > 0)
+    open_new_file();
 
   while (!end_program) {
 
@@ -438,12 +601,15 @@ int main(int argc, char **argv)
       if (use_md5)
 	MD5Update(&md5ctx, (unsigned char *) aligned_buf, rbytes);
 
-      if (valid_time && timetest(info, sizeof(info), &ot, &wbytes, 0)) {
+      if (valid_time && timetest(&bw, info, sizeof(info), &ot, &wbytes, 0)) {
 	char byte_info[256];
 	char unit[16];
 	double total;
 	size_transformation(&total, unit, tbytes);
-	snprintf(byte_info, sizeof byte_info, "\ttotal: %.2f %s (%lld bytes)", total, unit, tbytes);
+	sprintf(byte_info, "\ttotal: %.2f %s (%lld bytes)", total, unit, tbytes);
+
+	if (estimatedbytes > 0)
+	  append_eta(byte_info, bw, tbytes);
 
 	/* A check for just being pedantic. info[] is long enough always. */
 	if ((strlen(info) + strlen(byte_info) + 1) <= sizeof(info)) {
@@ -458,10 +624,16 @@ int main(int argc, char **argv)
       }
 
     } else if (ret == 0) {
-      end_program = 1;
+      if (n_files > 0) {
+	if (open_new_file() == 0)
+	  end_program = 1;
+      } else {
+	end_program = 1;
+      }
+
     } else {
       if (errno == EAGAIN) {
-	if (wait_stdin())
+	if (wait_input())
 	  end_program = 1;
 
       } else if (errno != EINTR) {
@@ -484,7 +656,7 @@ int main(int argc, char **argv)
 	      use_md5 ? " -> no MD5 sum" : "");
     }
 
-    timetest(info, sizeof(info), &vot, &bytes, 1);
+    timetest(&bw, info, sizeof(info), &vot, &bytes, 1);
     fprintf(stderr, "average %s\n", info);
 
     size_transformation(&total, unit, tbytes);
@@ -498,7 +670,7 @@ int main(int argc, char **argv)
   } while (0);
 
   free(real_buf);
-  close(0);
+  close(input_fd);
   close(1);
   return program_interrupted ? EXIT_FAILURE : EXIT_SUCCESS;
 }

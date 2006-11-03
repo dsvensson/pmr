@@ -1,6 +1,9 @@
 2006-11-03  Heikki Orsila <heikki.orsila@iki.fi>
 	- Ctrl-c will cause EXIT_FAILURE to be returned (process error code).
 	- Statistics will be printed on Ctrl-c (not MD5 sum)
+	- Implemented -s option to compute an ETA given a transfer size
+	- Giving regular files as parameters for pmr implies same as -s SUM,
+	  where SUM is the total size of the given files.
 
 2006-01-23  Heikki Orsila <heikki.orsila@iki.fi>
 	- Added support for non-blocking I/O if someone needs it. No practical
