@@ -500,5 +500,5 @@ int main(int argc, char **argv)
   free(real_buf);
   close(0);
   close(1);
-  return program_interrupted ? 1 : 0;
+  return program_interrupted ? EXIT_FAILURE : EXIT_SUCCESS;
 }
