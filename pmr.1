@@ -32,7 +32,9 @@ One can use IEC or SI standard multipliers for
 .I Bps
 : KiB = 1024, MiB = 1024^2, ...; kB = 1000, MB = 10^6, ... The IEC or SI
 multiplier must immediately follow the number. No whitespace is allowed
-between the numeric and scaling part.
+between the numeric and scaling part. All multipliers can be given as
+shortened versions by giving only first two letters. Also, IEC multipliers
+can be given with case-insensitive 2 letter versions: ki, mi, gi, ...
 
 An example: pmr -l 64KiB < /dev/zero > /dev/null
 .TP

@@ -145,13 +145,19 @@ static double inverse_size_transformation(const char *valuestr)
     return value;
 
   multiplier = 1.0;
+
+  /* we do case-sensitive comparison here to not mix bits and bytes */
+  if (strcmp(endptr, "B") == 0)
+    return value;
+
+  /* case-insensitive comparisons for IEC units */
   for (i = 0; i < NUNITS; i++) {
-    if (strncmp(endptr, iec_units[i], 2) == 0)
+    if (strncasecmp(endptr, iec_units[i], 2) == 0)
       return multiplier * value;
     multiplier *= 1024.0;
   }
 
-
+  /* case-sensitive comparisons for bytes with SI units */
   multiplier = 1.0;
   for (i = 0; i < NUNITS; i++) {
     if (strncmp(endptr, si_byte_units[i], 2) == 0)
@@ -159,6 +165,7 @@ static double inverse_size_transformation(const char *valuestr)
     multiplier *= 1000.0;
   }
 
+  /* case-sensitive comparisons for bits with SI multipliers */
   multiplier = 1.0 / 8;
   for (i = 0; i < NUNITS; i++) {
     if (strncmp(endptr, si_bit_units[i], 2) == 0)
