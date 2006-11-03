@@ -13,7 +13,8 @@ This man page documents pmr version 0.07 and maybe later.
 .SH DESCRIPTION
 .I pmr
 is a command line tool to measure bandwidth and amount of bytes going through
-the pipe.
+a command line pipe. It can also be used to limit pipe throughput in
+terms of bytes per second and compute md5sums of streams.
 
 .SH OPTIONS
 .TP
@@ -23,9 +24,13 @@ Display help
 .B \-l Bps
 Limit throughput to a given bytes per second rate
 .I Bps .
-One can use IEC 60027-2 standard specified scalers for these numbers.
-KiB = 1024, MiB = 1024^2, ..., kB = 1000, MB = 10^6, ... An example:
-pmr -l 64KiB < /dev/zero > /dev/null
+One can use IEC or SI standard multipliers for
+.I Bps
+: KiB = 1024, MiB = 1024^2, ...; kB = 1000, MB = 10^6, ... The IEC or SI
+multiplier must immediately follow the number. No whitespace is allowed
+between the numeric and scaling part.
+
+An example: pmr -l 64KiB < /dev/zero > /dev/null
 .TP
 .B \-m / \-\-md5
 Compute an md5 checksum of the stream. This is useful for verifying data integrity through TCP networks.
@@ -52,13 +57,25 @@ bytes
 Makes pmr touch each 4k page it has read from the kernel. Useful when
 benchmarking page copy speed with /dev/zero device.
 
-.SH EXAMPLES
+.SH EXAMPLE 1
 .nf
-Transfer SHELL_PATTERN files with netcat to a host:
+Transfer files with TCP from one host to another and simultaneously
+verify data checksums with MD5:
 .ft B
-tar cvf - SHELL_PATTERN |pmr |nc host port
+tar cv SHELL_PATTERN |pmr -m |nc host port
 
 .ft R
+The receiving end does:
+.ft B
+nc -l -p port |pmr -m |tar xv
+
+.ft R
+After the transfer, both ends can compare md5sums from pmr output, i.e. 
+the last output line off stderr.
+
+Optionally TCP transfer rate can be limited with -l.
+
+.SH EXAMPLE 2
 Generate lots of context switches:
 .ft B
 pmr < /dev/zero |cat > /dev/zero
