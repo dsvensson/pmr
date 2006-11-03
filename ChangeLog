@@ -1,3 +1,7 @@
+2006-11-03  Heikki Orsila <heikki.orsila@iki.fi>
+	- Ctrl-c will cause EXIT_FAILURE to be returned (process error code).
+	- Statistics will be printed on Ctrl-c (not MD5 sum)
+
 2006-01-23  Heikki Orsila <heikki.orsila@iki.fi>
 	- Added support for non-blocking I/O if someone needs it. No practical
 	  circumstance has ever come up. If it had, the pmr would have exited
