@@ -24,7 +24,9 @@
 
 extern int errno;
 
-static int end_program = 0;
+static int end_program;
+static int program_interrupted;
+
 static int default_interval = 2000;
 
 static int max_rate = -1;
@@ -32,9 +34,10 @@ static int rate_read_bytes = 0;
 struct timeval rate_time;
 
 
-static void sh(int sig)
+static void ctrlc_handler(int sig)
 {
-  sig = sig;
+  if (sig == SIGINT)
+    program_interrupted = 1;
   end_program = 1;
 }
 
@@ -144,6 +147,22 @@ static int timetest(char *s, size_t maxlen, struct timeval *ot, long long *bytes
   return 0;
 }
 
+
+static int wait_stdin(void)
+{
+  fd_set rfds;
+  FD_ZERO(&rfds);
+  FD_SET(0, &rfds);
+  if (select(1, &rfds, NULL, NULL, NULL) < 0) {
+    if (errno != EINTR) {
+      fprintf(stderr, "Read select error: %s\n", strerror(errno));
+      return -1;
+    }
+  }
+  return 0;
+}
+
+
 int read_no_rate_limit(char *buf, int size)
 {
   return read(0, buf, size);
@@ -191,19 +210,38 @@ int read_rate_limit(char *buf, int size)
   to_read = max_rate - rate_read_bytes;
   if (to_read > size)
     to_read = size;
+
   read_bytes = 0;
+
   while (read_bytes < to_read) {
+
     ret = read(0, buf + read_bytes , to_read - read_bytes);
+
     if (ret > 0) {
       read_bytes += ret;
+
     } else if (ret == 0) {
       break;
+
     } else {
-      if (errno != EINTR)
+      /* The upper-level will do error handling (EAGAIN, EINTR, ...) */
+      if (read_bytes == 0)
 	return -1;
+      break;
+    }
+
+    if (program_interrupted) {
+      if (read_bytes == 0) {
+	/* we must simulate some error condition for upper-level */
+	errno = EINTR;
+	return -1;
+      }
+      break;
     }
   }
+
   rate_read_bytes += read_bytes;
+
   return read_bytes;
 }
 
@@ -214,17 +252,22 @@ int main(int argc, char **argv)
   int carriage_return = 0;
   char *real_buf;
   char *aligned_buf;
-  struct sigaction act;
+
+  struct sigaction act = {
+    .sa_handler = ctrlc_handler
+  };
+
   struct timeval ot, vot;
   int i, ret, readoffs, rbytes;
   long long wbytes;
   long long tbytes;
   int poke_mem = 0;
-  char info[256];
   int valid_time = 1;
   int (*read_function)(char *buf, int size) = read_no_rate_limit;
   int use_md5 = 0;
   MD5_CTX md5ctx;
+
+  char info[256];
 
   for (i = 1; i < argc;) {
     if (!strcmp(argv[i], "-t")) {
@@ -282,6 +325,7 @@ int main(int argc, char **argv)
       i++;
       continue;
     }
+
     if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
       fprintf(stderr, "pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n\nUsage:\n\n", VERSION);
       fprintf(stderr, " %s [-l Bps] [-t seconds] [-p] [-b size] [-r] [-h/--help] [-v]\n\n", argv[0]);
@@ -298,6 +342,7 @@ int main(int argc, char **argv)
       fprintf(stderr, " -v\t\tPrint version, about, contact and home page information\n");
       return 0;
     }
+
     if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--version")) {
       fprintf(stderr, "pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n", VERSION);
       fprintf(stderr, "This program is public domain.\n");
@@ -305,6 +350,7 @@ int main(int argc, char **argv)
       fprintf(stderr, "\n  http://www.iki.fi/shd/foss/pmr/\n\n");
       return 0;
     }
+
     fprintf(stderr, "unknown args: %s\n", argv[i]);
     return -1;
   }
@@ -322,9 +368,8 @@ int main(int argc, char **argv)
   aligned_buf = real_buf;
   aligned_buf += PAGE_SIZE - (((long) aligned_buf) & (PAGE_SIZE - 1));
 
-  memset(&act, 0, sizeof(act));
-  act.sa_handler = sh;
   sigaction(SIGPIPE, &act, 0);
+  sigaction(SIGINT, &act, 0);
 
   if (gettimeofday(&ot, 0)) {
     memset(&ot, 0, sizeof(ot));
@@ -340,8 +385,11 @@ int main(int argc, char **argv)
   while (!end_program) {
 
     ret = read_function(aligned_buf, aligned_size);
-    if (ret > 0) {
 
+    /* Note, we will try to write all data received so far even if the
+       program has been aborted (SIGINT) */
+
+    if (ret > 0) {
       /* you may ignore poke_mem code (just for performance evaluation) */
       if (poke_mem) {
 	do {
@@ -413,15 +461,9 @@ int main(int argc, char **argv)
       end_program = 1;
     } else {
       if (errno == EAGAIN) {
-	fd_set rfds;
-	FD_ZERO(&rfds);
-	FD_SET(0, &rfds);
-	if (select(1, &rfds, NULL, NULL, NULL)) {
-	  if (errno != EINTR) {
-	    fprintf(stderr, "Read select error: %s\n", strerror(errno));
-	    end_program = 1;
-	  }
-	}
+	if (wait_stdin())
+	  end_program = 1;
+
       } else if (errno != EINTR) {
 	perror("pmr: Read error");
 	end_program = 1;
@@ -435,13 +477,21 @@ int main(int argc, char **argv)
     double total;
     char unit[16];
 
-    timetest(info, sizeof(info), &vot, &bytes, 1);
     fprintf(stderr, "                                                     \r");
+
+    if (program_interrupted) {
+      fprintf(stderr, "Program interrupted%s\n",
+	      use_md5 ? " -> no MD5 sum" : "");
+    }
+
+    timetest(info, sizeof(info), &vot, &bytes, 1);
     fprintf(stderr, "average %s\n", info);
 
     size_transformation(&total, unit, tbytes);
+
     fprintf(stderr, "total: %.2f %s (%lld bytes)\n", total, unit, tbytes);
-    if (use_md5) {
+
+    if (use_md5 && program_interrupted == 0) {
       MD5Final(md5, &md5ctx);
       fprintf(stderr, "md5sum: %.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x\n",md5[0],md5[1],md5[2],md5[3],md5[4],md5[5],md5[6],md5[7],md5[8],md5[9],md5[10],md5[11],md5[12],md5[13],md5[14],md5[15]);
     }
@@ -450,5 +500,5 @@ int main(int argc, char **argv)
   free(real_buf);
   close(0);
   close(1);
-  return 0;
+  return program_interrupted ? 1 : 0;
 }
