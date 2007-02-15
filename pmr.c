@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <unistd.h>
@@ -22,6 +23,10 @@
 #include <assert.h>
 
 #include "md5.h"
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
 
 #define darray_append(n, nallocated, array, item) do { \
@@ -397,8 +402,6 @@ static void write_info(const char *info)
     /* Writes length amount of spaces and then a carriage return (\r) */
     assert(old_line_length >= 0);
 
-    fprintf(stderr, "%d\n", old_line_length);
-
     while (old_line_length >= SPACE_LENGTH) {
       fwrite(space, 1, SPACE_LENGTH, stderr);
       old_line_length -= SPACE_LENGTH;
@@ -419,6 +422,54 @@ static void write_info(const char *info)
     /* Write info */
     fprintf(stderr, "%s\n", info);
   }
+}
+
+
+static void read_config(int *use_md5)
+{
+  char *home;
+  char cfilename[PATH_MAX];
+  FILE *cfile;
+  char word[256];
+  int t;
+  int ret;
+
+  home = getenv("HOME");
+  if (home == NULL)
+    return;
+
+  snprintf(cfilename, sizeof cfilename, "%s/.pmr", home);
+
+  cfile = fopen(cfilename, "r");
+  if (cfile == NULL)
+    return;
+
+  while (1) {
+    ret = fscanf(cfile, "%s", word);
+    if (ret <= 0)
+      break;
+
+    if (strncasecmp(word, "carriage_return", 8) == 0) {
+      use_carriage_return = 1;
+
+    } else if (strncasecmp(word, "md5", 3) == 0) {
+      *use_md5 = 1;
+
+    } else if (strncasecmp(word, "update_interval", 3) == 0) {
+      ret = fscanf(cfile, "%d", &t);
+      if (ret <= 0) {
+	fprintf(stderr, "Missing update interval\n");
+	continue;
+      }
+      assert(t >= 0);
+      default_interval = 1000 * t;
+
+    } else {
+      fprintf(stderr, "Unknown configuration directive: %s\n", word);
+    }
+  }
+
+  fclose(cfile);
 }
 
 
@@ -448,6 +499,8 @@ int main(int argc, char **argv)
   int no_options = 0;
 
   double presize = 0.0;
+
+  read_config(&use_md5);
 
   for (i = 1; i < argc;) {
 
@@ -520,7 +573,6 @@ int main(int argc, char **argv)
 
     if (!strcmp(argv[i], "-m") || !strcmp(argv[i], "--md5")) {
       use_md5 = 1;
-      MD5Init(&md5ctx);
       i++;
       continue;
     }
@@ -574,6 +626,9 @@ int main(int argc, char **argv)
     fprintf(stderr, "unknown args: %s\n", argv[i]);
     return -1;
   }
+
+  if (use_md5)
+    MD5Init(&md5ctx);
 
   if (presize > 0.0)
     estimatedbytes = presize;
