@@ -1,5 +1,6 @@
 2007-02-15  Heikki Orsila <heikki.orsila@iki.fi>
-	- Fixed carriage return mode
+	* version 0.12
+	- Fixed the carriage return mode
 	- Added configuration file support. pmr tries to read a configuration
 	  file at startup. It can be used to set following default attributes:
 	  time update interval, rate limit, md5sum mode and carriage return
