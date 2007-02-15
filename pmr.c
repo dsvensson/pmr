@@ -21,6 +21,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <assert.h>
+#include <ctype.h>
 
 #include "md5.h"
 
@@ -66,7 +67,10 @@ static int program_interrupted;
 
 static int default_interval = 2000;
 
+static int read_no_rate_limit(char *buf, int size);
+
 static int max_rate = -1;
+static int (*read_function)(char *buf, int size) = read_no_rate_limit;
 static int rate_read_bytes = 0;
 struct timeval rate_time;
 
@@ -291,12 +295,12 @@ static int wait_input(void)
 }
 
 
-int read_no_rate_limit(char *buf, int size)
+static int read_no_rate_limit(char *buf, int size)
 {
   return read(input_fd, buf, size);
 }
 
-int read_rate_limit(char *buf, int size)
+static int read_rate_limit(char *buf, int size)
 {
   int ret;
   int to_read, read_bytes;
@@ -411,17 +415,60 @@ static void write_info(const char *info)
 
     fprintf(stderr, "\r");
 
-    /* Write info */
-    old_line_length = fprintf(stderr, "%s\r", info) - 1;
+    old_line_length = 0;
 
-    /* In case stderr is lost (how??) */
-    if (old_line_length < 0)
-      old_line_length = 0;
+    if (info != NULL) {
+      /* Write info */
+      old_line_length = fprintf(stderr, "%s\r", info) - 1;
+
+      /* In case stderr is lost (how??) */
+      if (old_line_length < 0)
+	old_line_length = 0;
+    }
 
   } else {
-    /* Write info */
-    fprintf(stderr, "%s\n", info);
+    if (info != NULL) {
+      /* Write info */
+      fprintf(stderr, "%s\n", info);
+    }
   }
+}
+
+
+/* skip whitespace characters. return -1 if end of line reached */
+static int skip_ws(const char *line, int ind)
+{
+  while (isspace(line[ind]))
+    ind++;
+  if (line[ind] == 0)
+    ind = -1;
+  return ind;
+}
+
+
+/* skip non-whitespace characters. return -1 if end of line reached */
+static int skip_nws(const char *line, int ind)
+{
+  while (line[ind] != 0 && isspace(line[ind]) == 0)
+    ind++;
+  if (line[ind] == 0)
+    ind = -1;
+  return ind;
+}
+
+
+static void set_bw_limit(const char *limit)
+{
+  double value = inverse_size_transformation(limit);
+  if (value <= 0) {
+    fprintf (stderr, "illegal bytes per second value (%s)\n", limit);
+    exit(1);
+  } else if (value >= 2147483648UL) {
+    fprintf(stderr, "too high bytes per second value (%s)\n", limit);
+    exit(1);
+  }
+  max_rate = value;
+  read_function = read_rate_limit;
 }
 
 
@@ -430,10 +477,13 @@ static void read_config(int *use_md5)
   char *home;
   char cfilename[PATH_MAX];
   FILE *cfile;
-  char word[256];
+  char line[256];
+  char *word, *opt;
   int t;
   int ret;
+  char *lineret;
 
+  /* First try home directory */
   home = getenv("HOME");
   if (home == NULL)
     return;
@@ -441,27 +491,64 @@ static void read_config(int *use_md5)
   snprintf(cfilename, sizeof cfilename, "%s/.pmr", home);
 
   cfile = fopen(cfilename, "r");
-  if (cfile == NULL)
-    return;
+  if (cfile == NULL) {
+
+    /* Then try /etc directory */
+    snprintf(cfilename, sizeof cfilename, "/etc/pmr");
+
+    cfile = fopen(cfilename, "r");
+    if (cfile == NULL)
+      return;
+  }
 
   while (1) {
-    ret = fscanf(cfile, "%s", word);
-    if (ret <= 0)
+
+    lineret = fgets(line, sizeof line, cfile);
+    if (lineret == NULL)
       break;
+    if (line[0] == '#')
+      continue; /* comment line */
+
+    ret = skip_ws(line, 0);
+    if (ret < 0)
+      continue; /* empty line */
+
+    word = &line[ret];
+
+    /* Get second option from the line, if exists */
+    opt = NULL;
+    ret = skip_nws(line, ret);
+    if (ret > 0) {
+      ret = skip_ws(line, ret);
+      if (ret > 0) {
+	/* We have an option. zero-terminate it. */
+	opt = &line[ret];
+	ret = skip_nws(opt, 0);
+	if (ret > 0)
+	  opt[ret] = 0;
+      }
+    }
 
     if (strncasecmp(word, "carriage_return", 8) == 0) {
       use_carriage_return = 1;
+
+    } else if (strncasecmp(word, "limit", 5) == 0) {
+      if (opt == NULL) {
+	fprintf(stderr, "Missing limit value\n");
+	continue;
+      }
+      set_bw_limit(opt);
 
     } else if (strncasecmp(word, "md5", 3) == 0) {
       *use_md5 = 1;
 
     } else if (strncasecmp(word, "update_interval", 3) == 0) {
-      ret = fscanf(cfile, "%d", &t);
-      if (ret <= 0) {
+      if (opt == NULL) {
 	fprintf(stderr, "Missing update interval\n");
 	continue;
       }
-      assert(t >= 0);
+      t = atoi(opt);
+      assert(t >= 0 && t < INT_MAX / 1000);
       default_interval = 1000 * t;
 
     } else {
@@ -490,7 +577,6 @@ int main(int argc, char **argv)
 
   int poke_mem = 0;
   int valid_time = 1;
-  int (*read_function)(char *buf, int size) = read_no_rate_limit;
   int use_md5 = 0;
   MD5_CTX md5ctx;
 
@@ -534,7 +620,7 @@ int main(int argc, char **argv)
 	default_interval = 1000 * atoi(argv[i + 1]);
       } else {
 	fprintf (stderr, "expecting a value for -t\n");
-	return -1;
+	exit(1);
       }
       i += 2;
       continue;
@@ -545,7 +631,7 @@ int main(int argc, char **argv)
 	aligned_size = atoi(argv[i + 1]);
       } else {
 	fprintf (stderr, "expecting a value for -b\n");
-	return -1;
+	exit(1);
       }
       i += 2;
       continue;
@@ -553,19 +639,10 @@ int main(int argc, char **argv)
 
     if (!strcmp(argv[i], "-l")) {
       if ((i + 1) < argc) {
-	double value = inverse_size_transformation(argv[i + 1]);
-	if (value <= 0) {
-	  fprintf (stderr, "illegal bytes per second value (%s)\n", argv[i + 1]);
-	  return -1;
-	} else if (value >= 2147483648UL) {
-	  fprintf(stderr, "too high bytes per second value (%s)\n", argv[i + 1]);
-	  return -1;
-	}
-        max_rate = value;
-	read_function = read_rate_limit;
+	set_bw_limit(argv[i + 1]);
       } else {
         fprintf (stderr, "expecting a value for bandwidth limit (bytes per second)\n");
-        return -1;
+        exit(1);
       }
       i += 2;
       continue;
@@ -624,7 +701,7 @@ int main(int argc, char **argv)
     }
 
     fprintf(stderr, "unknown args: %s\n", argv[i]);
-    return -1;
+    exit(1);
   }
 
   if (use_md5)
@@ -758,7 +835,7 @@ int main(int argc, char **argv)
     double total;
     char unit[16];
 
-    fprintf(stderr, "                                                     \r");
+    write_info(NULL);
 
     if (program_interrupted) {
       fprintf(stderr, "Program interrupted%s\n",

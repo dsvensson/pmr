@@ -1,3 +1,10 @@
+2007-02-15  Heikki Orsila <heikki.orsila@iki.fi>
+	- Fixed carriage return mode
+	- Added configuration file support. pmr tries to read a configuration
+	  file at startup. It can be used to set following default attributes:
+	  time update interval, rate limit, md5sum mode and carriage return
+	  mode. See the man page for more information.
+
 2006-11-03  Heikki Orsila <heikki.orsila@iki.fi>
 	- Ctrl-c will cause EXIT_FAILURE to be returned (process error code).
 	- Statistics will be printed on Ctrl-c (not MD5 sum)

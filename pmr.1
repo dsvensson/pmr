@@ -20,6 +20,9 @@ an ETA for completion.
 If regular files are given as parameters, they are concatenated to the
 standard output and an ETA is computed based on the total size of the files.
 
+pmr tries to read a configuration file at startup. It can be used to set a
+specific default behavior. See CONFIGURATION FILE section.
+
 .SH OPTIONS
 .TP
 .B \-h
@@ -67,6 +70,23 @@ bytes
 Makes pmr touch each 4k page it has read from the kernel. Useful when
 benchmarking page copy speed with /dev/zero device.
 
+.SH CONFIGURATION FILE
+pmr tries to read a configuration file at startup. It can be used to set a
+specific default behavior. pmr first tries to read it from
+$(HOME)/.pmr and second time from /etc/pmr. If configuration file is found,
+it is read line by line. Lines beginning with # are comment lines.
+Whitespace is ignored.
+
+A line can contain 0 or 1 directives. Valid directives are:
+.br
+    carriage           (enable carriage return mode, see -r)
+br
+    limit rate         (set rate limit, see -l)
+.br
+    md5                (enable md5sum mode, see -m)
+.br
+    update t           (set update time interval, see -t)
+
 .SH EXAMPLE 1
 .nf
 Transfer files with TCP from one host to another and simultaneously
@@ -94,8 +114,13 @@ pmr < /dev/zero |cat > /dev/zero
 The bandwidth is printed in IEC 60027-2 (2000-11) Ed. 2.0 recommended 
 format (KiB, MiB, GiB, ...).
 
+.SH FILES
+.br
+/etc/pmr (global configuration file)
+.br
+$(HOME)/.pmr (user-specific configuration file)
+
 .SH AUTHOR
 .B pmr
-was written by Heikki Orsila <heikki.orsila@iki.fi>. His web page is
-located at http://www.iki.fi/shd/
+was written by Heikki Orsila <heikki.orsila@iki.fi>: http://www.iki.fi/shd/
 .br
