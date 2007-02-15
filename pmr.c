@@ -625,7 +625,7 @@ int main(int argc, char **argv)
 	if ((strlen(info) + strlen(byte_info) + 1) <= sizeof(info)) {
 	  strcat(info, byte_info);
 	  if (carriage_return) {
-	    fprintf(stderr, "                                                     \r");
+	    fprintf(stderr, "                                                                   \r");
 	    fprintf(stderr, "%s\r", info);
 	  } else {
 	    fprintf(stderr, "%s\n", info);
