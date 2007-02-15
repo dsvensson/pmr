@@ -1,5 +1,5 @@
-/* pmr by Heikki Orsila <heikki.orsila@iki.fi> (2003.12.28)
-   This source is public domain. Do what you want with it.
+/* pmr by Heikki Orsila <heikki.orsila@iki.fi>
+   This source is in public domain. Do what you want with it.
 
    Get latest version of pmr from: http://www.iki.fi/shd/foss/pmr/
 
@@ -74,6 +74,11 @@ static long long estimatedbytes;
 
 #define SPEED_WINDOW_SIZE 3
 static double speed_window[SPEED_WINDOW_SIZE];
+
+#define SPACE_LENGTH 80
+static char space[SPACE_LENGTH];
+static int old_line_length;
+static int use_carriage_return;
 
 
 static void append_eta(char *info, double bw, long long tbytes)
@@ -364,10 +369,62 @@ int read_rate_limit(char *buf, int size)
 }
 
 
+static void print_usage(const char *pname)
+{
+  fprintf(stderr, "pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n\nUsage:\n\n", VERSION);
+  fprintf(stderr, " %s [-l Bps] [-s size] [-m] [-t seconds] [-p] [-b size] [-r] [-v] FILE ...\n\n", pname);
+  fprintf(stderr, " -b size\tset input buffer size (default %d)\n", BUFFER_SIZE);
+  fprintf(stderr, " -l Bps\t\tLimit throughput to 'Bps' bytes per second. It is also\n");
+  fprintf(stderr, "\t\tpossible to use SI, IEC 60027 and bit units in the value.\n");
+  fprintf(stderr, "\t\tSI units include kB, MB, ..., IEC units include KiB, MiB, ...\n");
+  fprintf(stderr, "\t\tand bit units include kbit, Mbit, ...\n");
+  fprintf(stderr, " -m / --md5\tCompute an md5 checksum of the stream (useful for verifying\n");
+  fprintf(stderr, "\t\tdata integrity through TCP networks)\n");
+  fprintf(stderr, " -p\t\tEnables 4k page poking (useless)\n");
+  fprintf(stderr, " -r\t\tUse carriage return on output, no newline\n");
+  fprintf(stderr, " -s size\tCalculate ETA given a size estimate. Giving regular files\n");
+  fprintf(stderr, "\t\tas pmr parameters implies -s SUM, where SUM is the total\n");
+  fprintf(stderr, "\t\tsize of those files.\n");
+  fprintf(stderr, " -t secs\tUpdate interval in seconds\n");
+  fprintf(stderr, " -v\t\tPrint version, about, contact and home page information\n");
+}
+
+
+static void write_info(const char *info)
+{
+  if (use_carriage_return) {
+
+    /* Writes length amount of spaces and then a carriage return (\r) */
+    assert(old_line_length >= 0);
+
+    fprintf(stderr, "%d\n", old_line_length);
+
+    while (old_line_length >= SPACE_LENGTH) {
+      fwrite(space, 1, SPACE_LENGTH, stderr);
+      old_line_length -= SPACE_LENGTH;
+    }
+
+    fwrite(space, 1, old_line_length, stderr);
+
+    fprintf(stderr, "\r");
+
+    /* Write info */
+    old_line_length = fprintf(stderr, "%s\r", info) - 1;
+
+    /* In case stderr is lost (how??) */
+    if (old_line_length < 0)
+      old_line_length = 0;
+
+  } else {
+    /* Write info */
+    fprintf(stderr, "%s\n", info);
+  }
+}
+
+
 int main(int argc, char **argv)
 {
   int aligned_size = BUFFER_SIZE;
-  int carriage_return = 0;
   char *real_buf;
   char *aligned_buf;
 
@@ -429,6 +486,7 @@ int main(int argc, char **argv)
       i += 2;
       continue;
     }
+
     if (!strcmp(argv[i], "-b")) {
       if ((i + 1) < argc) {
 	aligned_size = atoi(argv[i + 1]);
@@ -439,6 +497,7 @@ int main(int argc, char **argv)
       i += 2;
       continue;
     }
+
     if (!strcmp(argv[i], "-l")) {
       if ((i + 1) < argc) {
 	double value = inverse_size_transformation(argv[i + 1]);
@@ -458,17 +517,21 @@ int main(int argc, char **argv)
       i += 2;
       continue;
     }
+
     if (!strcmp(argv[i], "-m") || !strcmp(argv[i], "--md5")) {
       use_md5 = 1;
       MD5Init(&md5ctx);
       i++;
       continue;
     }
+
     if (!strcmp(argv[i], "-r")) {
-      carriage_return = 1;
+      use_carriage_return = 1;
+      memset(space, 0, SPACE_LENGTH);
       i++;
       continue;
     }
+
     if (!strcmp(argv[i], "-s")) {
       if ((i + 1) >= argc) {
 	fprintf(stderr, "Not enough args. Missing size estimate.\n");
@@ -482,6 +545,7 @@ int main(int argc, char **argv)
       i += 2;
       continue;
     }
+
     if (!strcmp(argv[i], "-p")) {
       poke_mem = 1;
       i++;
@@ -489,22 +553,7 @@ int main(int argc, char **argv)
     }
 
     if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
-      fprintf(stderr, "pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n\nUsage:\n\n", VERSION);
-      fprintf(stderr, " %s [-l Bps] [-s size] [-m] [-t seconds] [-p] [-b size] [-r] [-v] FILE ...\n\n", argv[0]);
-      fprintf(stderr, " -b size\tset input buffer size (default %d)\n", BUFFER_SIZE);
-      fprintf(stderr, " -l Bps\t\tLimit throughput to 'Bps' bytes per second. It is also\n");
-      fprintf(stderr, "\t\tpossible to use SI, IEC 60027 and bit units in the value.\n");
-      fprintf(stderr, "\t\tSI units include kB, MB, ..., IEC units include KiB, MiB, ...\n");
-      fprintf(stderr, "\t\tand bit units include kbit, Mbit, ...\n");
-      fprintf(stderr, " -m / --md5\tCompute an md5 checksum of the stream (useful for verifying\n");
-      fprintf(stderr, "\t\tdata integrity through TCP networks)\n");
-      fprintf(stderr, " -p\t\tEnables 4k page poking (useless)\n");
-      fprintf(stderr, " -r\t\tUse carriage return on output, no newline\n");
-      fprintf(stderr, " -s size\tCalculate ETA given a size estimate. Giving regular files\n");
-      fprintf(stderr, "\t\tas pmr parameters implies -s SUM, where SUM is the total\n");
-      fprintf(stderr, "\t\tsize of those files.\n");
-      fprintf(stderr, " -t secs\tUpdate interval in seconds\n");
-      fprintf(stderr, " -v\t\tPrint version, about, contact and home page information\n");
+      print_usage(argv[0]);
       return 0;
     }
 
@@ -624,12 +673,7 @@ int main(int argc, char **argv)
 	/* A check for just being pedantic. info[] is long enough always. */
 	if ((strlen(info) + strlen(byte_info) + 1) <= sizeof(info)) {
 	  strcat(info, byte_info);
-	  if (carriage_return) {
-	    fprintf(stderr, "                                                                   \r");
-	    fprintf(stderr, "%s\r", info);
-	  } else {
-	    fprintf(stderr, "%s\n", info);
-	  }
+	  write_info(info);
 	}
       }
 
