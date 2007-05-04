@@ -23,7 +23,7 @@ check:	pmr
 
 mydist:
 	mkdir -p dist
-	cp configure Makefile.in pmr.c pmr.1 ChangeLog md5c.c md5.h md5.copyright dist/
+	cp configure Makefile.in pmr.c pmr.1 ChangeLog COPYING md5c.c md5.h md5.copyright dist/
 
 clean:	
 	rm -f *.o pmr
