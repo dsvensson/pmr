@@ -232,8 +232,14 @@ static void handle_pipe(struct pipe *p)
 
 	} else if (ret == 0) {
 	    /* Only pipe 0 can have regular files queued for it */
-	    if (p->id != 0 || open_new_file(p) == 0)
+	    if (p->id != 0 || open_new_file(p) == 0) {
 		terminated_pipes++;
+		p->terminated = 1;
+
+		/* Close output fd to cause EOF for the spawned process */
+		close(p->out_fd);
+		p->out_fd = -1;
+	    }
 
 	} else {
 	    if (errno != EAGAIN && errno != EINTR) {
@@ -694,7 +700,11 @@ void spawn_process(const char **args)
     close(toprocess[0]);
     close(fromprocess[1]);
 
-    initialize_pipe(1, fromprocess[0], toprocess[1]);
+    /* pipe 0: pmr stdin -> process stdin */
+    pipes[0].out_fd = toprocess[1];
+
+    /* pipe 1: process stdout -> pmr stdout */
+    initialize_pipe(1, fromprocess[0], 1);
 }
 
 
@@ -963,31 +973,39 @@ int main(int argc, char **argv)
 
 	maxfd = 0;
 
-	if (pipes[0].wbytes == pipes[0].rbytes)
-	    set_fd(&maxfd, pipes[0].in_fd, &rfds);
-	else
-	    set_fd(&maxfd, pipes[0].out_fd, &wfds);
+	if (!pipes[0].terminated) {
+	    if (pipes[0].wbytes == pipes[0].rbytes)
+		set_fd(&maxfd, pipes[0].in_fd, &rfds);
+	    else
+		set_fd(&maxfd, pipes[0].out_fd, &wfds);
+	}
 
-	if (pipes[1].wbytes == pipes[1].rbytes)
-	    set_fd(&maxfd, pipes[1].in_fd, &rfds);
-	else
-	    set_fd(&maxfd, pipes[1].out_fd, &wfds);
+	if (!pipes[1].terminated) {
+	    if (pipes[1].wbytes == pipes[1].rbytes)
+		set_fd(&maxfd, pipes[1].in_fd, &rfds);
+	    else
+		set_fd(&maxfd, pipes[1].out_fd, &wfds);
+	}
 
 	ret = select(maxfd + 1, &rfds, &wfds, NULL, NULL);
 
-	if (ret < 0 && ret != EINTR) {
+	if (ret < 0 && errno != EINTR) {
 	    perror("pmr: select() error");
 	    exit(1);
 	}
 
-	if (FD_ISSET(pipes[0].in_fd, &rfds) ||
-	    FD_ISSET(pipes[0].out_fd, &wfds)) {
-	    handle_pipe(&pipes[0]);
+	if (!pipes[0].terminated) {
+	    if (FD_ISSET(pipes[0].in_fd, &rfds) ||
+		FD_ISSET(pipes[0].out_fd, &wfds)) {
+		handle_pipe(&pipes[0]);
+	    }
 	}
 
-	if (FD_ISSET(pipes[1].in_fd, &rfds) ||
-	    FD_ISSET(pipes[1].out_fd, &wfds)) {
-	    handle_pipe(&pipes[1]);
+	if (!pipes[1].terminated) {
+	    if (FD_ISSET(pipes[1].in_fd, &rfds) ||
+		FD_ISSET(pipes[1].out_fd, &wfds)) {
+		handle_pipe(&pipes[1]);
+	    }
 	}
     }
 
