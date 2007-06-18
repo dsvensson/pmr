@@ -251,7 +251,7 @@ static void handle_pipe(struct pipe *p)
     } else {
 
 	rdata = &p->aligned_buf[p->readoffs];
-	ret = write(p->out_fd, rdata, p->rbytes - p->wbytes - p->readoffs);
+	ret = write(p->out_fd, rdata, p->rbytes - p->wbytes);
 
 	if (ret > 0) {
 	    p->wbytes += ret;
@@ -330,8 +330,6 @@ static void initialize_pipe(int id, int in_fd, int out_fd)
     }
 
     p->measurement_time = p->rate_time;
-
-    fcntl(in_fd, F_SETFL, O_NONBLOCK);
 
     MD5Init(&p->md5ctx);
 
@@ -579,19 +577,17 @@ static int read_rate_limit(struct pipe *p)
     while (read_bytes < to_read) {
 
 	ret = read(p->in_fd, p->aligned_buf + read_bytes, to_read - read_bytes);
-
-	if (ret > 0) {
-	    read_bytes += ret;
-
-	} else if (ret == 0) {
+	if (ret == 0) {
 	    break;
 
-	} else {
+	} else if (ret < 0) {
 	    /* The upper-level will do error handling (EAGAIN, EINTR, ...) */
 	    if (read_bytes == 0)
 		return -1;
 	    break;
 	}
+
+	read_bytes += ret;
 
 	if (program_interrupted) {
 	    if (read_bytes == 0) {
@@ -804,7 +800,7 @@ int main(int argc, char **argv)
     int i, ret;
     int no_options = 0;
     double presize = 0.0;
-    int exec_mode = 0;
+    int exec_arg_i = -1;
 
     read_config();
 
@@ -854,8 +850,10 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Too few arguments for -e\n");
 		exit(1);
 	    }
-	    exec_mode = 1;
-	    fprintf(stderr, "Warning: -e option is totally broken.\n");
+
+	    exec_arg_i = i + 1; /* store the index of command and its args */
+
+	    fprintf(stderr, "pmr warning: -e option is totally broken.\n");
 	    break;
 	}
 
@@ -936,9 +934,17 @@ int main(int argc, char **argv)
 
     initialize_pipe(0, 0, 1);
 
-    if (exec_mode) {
+    if (exec_arg_i > 0) {
 	/* Pipe 1 is initialized here */
-	spawn_process((const char **) &argv[i + 1]);
+	spawn_process((const char **) &argv[exec_arg_i]);
+    }
+
+    /* Use non-blocking IO (select()) with > 1 pipes */
+    if (n_pipes > 1) {
+	for (i = 0; i < n_pipes; i++) {
+	    fcntl(pipes[i].in_fd, F_SETFL, O_NONBLOCK);
+	    fcntl(pipes[i].out_fd, F_SETFL, O_NONBLOCK);
+	}
     }
 
     /* Record creation time of pipe 0 to determine total run-time of pmr */
@@ -961,7 +967,7 @@ int main(int argc, char **argv)
 	fd_set rfds, wfds;
 	int maxfd;
 
-	/* Optimise the single pipe case */
+	/* Optimise the single pipe case (uses blocking IO) */
 	if (n_pipes == 1) {
 	    handle_pipe(&pipes[0]);
 	    continue;
