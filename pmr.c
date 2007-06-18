@@ -855,6 +855,7 @@ int main(int argc, char **argv)
 		exit(1);
 	    }
 	    exec_mode = 1;
+	    fprintf(stderr, "Warning: -e option is totally broken.\n");
 	    break;
 	}
 
