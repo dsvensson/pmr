@@ -5,10 +5,10 @@ pmr \- command line pipe measurement tool for Unixes
 
 .SH SYNTAX
 .B pmr
-[\fB-l Bps\fR] [\fB-s size\fR] [\fB-m\fR] [\fB-r\fR] [\fB-t secs\fR] [\fB-b size\fR] [\fB-v\fR] FILE ...
+[\fB-l Bps\fR] [\fB-s size\fR] [\fB-m\fR] [\fB-e com\fR] [\fB-r\fR] [\fB-t secs\fR] [\fB-b size\fR] [\fB-v\fR] FILE ...
 
 .SH VERSION
-This man page documents pmr version 0.12 and maybe later.
+This man page documents pmr version 0.13 and maybe later.
 
 .SH DESCRIPTION
 .I pmr
@@ -24,6 +24,15 @@ pmr tries to read a configuration file at startup. It can be used to set a
 specific default behavior. See CONFIGURATION FILE section.
 
 .SH OPTIONS
+.TP
+.B \-e com args
+Run command
+.I com
+with
+.I args
+, copy stdin of pmr to the stdin of he command, and copy stdout of the
+command to the stdout of pmr. pmr acts as a measuring filter between the
+shell and the command.
 .TP
 .B \-h
 Display help
@@ -104,7 +113,12 @@ Optionally TCP transfer rate can be limited with -l.
 .SH EXAMPLE 2
 Generate lots of context switches:
 .ft B
-pmr < /dev/zero |cat > /dev/zero
+pmr < /dev/zero |cat > /dev/null
+
+.ft R
+Or optionally, use spawning mode:
+.ft B
+pmr -e cat < /dev/zero > /dev/null
 
 .SH CONFORMING TO
 The bandwidth is printed in IEC 60027-2 (2000-11) Ed. 2.0 recommended 
