@@ -106,7 +106,7 @@ static void write_info(const char *info);
 extern int errno;
 
 static int terminated_pipes;
-static int program_interrupted;
+static int program_return_value = EXIT_SUCCESS;
 static int childpipe[2] = {-1, -1};
 
 static int default_interval = 2000;
@@ -206,7 +206,7 @@ void close_pipe(struct pipe *p)
 static void ctrlc_and_pipe_handler(int sig)
 {
     if (sig == SIGINT)
-	program_interrupted = 1;
+	program_return_value = 1;
 
     terminated_pipes = 2;
 }
@@ -257,6 +257,7 @@ static void handle_pipe(struct pipe *p)
 	} else if (errno != EAGAIN && errno != EINTR) {
 	    perror("pmr: Read error");
 	    close_pipe(p);
+	    program_return_value = 1;
 	}
 
     } else {
@@ -280,6 +281,7 @@ static void handle_pipe(struct pipe *p)
 	} else if (errno != EINTR && errno != EAGAIN) {
 	    perror("pmr: Write error");
 	    close_pipe(p);
+	    program_return_value = 1;
 	    return;
 	}
 
@@ -543,8 +545,7 @@ static int read_rate_limit(struct pipe *p)
 	return read_no_rate_limit(p);
 
     if (gettimeofday(&new_rate_time, 0)) {
-	perror
-	    ("pmr: gettimeofday failed. can not limit rate. going max speed.");
+	perror("pmr: gettimeofday failed. can not limit rate. going max speed.");
 	p->max_rate = -1;
 	return read_no_rate_limit(p);
     }
@@ -586,26 +587,16 @@ static int read_rate_limit(struct pipe *p)
     while (read_bytes < to_read) {
 
 	ret = read(p->in_fd, p->aligned_buf + read_bytes, to_read - read_bytes);
-	if (ret == 0) {
-	    break;
-
-	} else if (ret < 0) {
-	    /* The upper-level will do error handling (EAGAIN, EINTR, ...) */
-	    if (read_bytes == 0)
+	if (ret <= 0) {
+	    /* If 0 bytes read so far and an error happens, handle it on
+	       a higher level */
+	    if (ret < 0 && read_bytes == 0)
 		return -1;
+
 	    break;
 	}
 
 	read_bytes += ret;
-
-	if (program_interrupted) {
-	    if (read_bytes == 0) {
-		/* we must simulate some error condition for upper-level */
-		errno = EINTR;
-		return -1;
-	    }
-	    break;
-	}
     }
 
     p->rate_read_bytes += read_bytes;
@@ -945,7 +936,7 @@ int main(int argc, char **argv)
 	/* Create a pipe to terminate select() in main loop from child
 	   signal handler */
 	if (pipe(childpipe)) {
-	    perror("Can not create a child pipe");
+	    perror("Can not create a pipe for the child handler");
 	    exit(1);
 	}
 
@@ -954,10 +945,8 @@ int main(int argc, char **argv)
 
 	/* Pipe 1 is initialized here */
 	spawn_process((const char **) &argv[exec_arg_i]);
-    }
 
-    if (n_pipes > 1) {
-	/* Use non-blocking IO (select()) with > 1 pipes */
+	/* Use non-blocking IO (select()) with 2 pipes */
 	for (i = 0; i < n_pipes; i++) {
 	    fcntl(pipes[i].in_fd, F_SETFL, O_NONBLOCK);
 	    fcntl(pipes[i].out_fd, F_SETFL, O_NONBLOCK);
@@ -1046,8 +1035,8 @@ int main(int argc, char **argv)
 
 	write_info(NULL);
 
-	if (program_interrupted) {
-	    fprintf(stderr, "Program interrupted%s\n",
+	if (program_return_value) {
+	    fprintf(stderr, "Unexpected termination%s\n",
 		    use_md5 ? " -> no MD5 sum" : "");
 	}
 
@@ -1067,7 +1056,7 @@ int main(int argc, char **argv)
 	fprintf(stderr, "total: %.2f %s (%lld bytes)\n", total, unit,
 		pipes[0].wbytes);
 
-	if (use_md5 && program_interrupted == 0) {
+	if (use_md5 && program_return_value == 0) {
 	    MD5Final(md5, &pipes[0].md5ctx);
 	    fprintf(stderr, "md5sum: %.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x\n",
 		    md5[0], md5[1], md5[2], md5[3], md5[4], md5[5], md5[6],
@@ -1078,5 +1067,5 @@ int main(int argc, char **argv)
 
     close(1);
 
-    return program_interrupted ? EXIT_FAILURE : EXIT_SUCCESS;
+    return program_return_value;
 }
