@@ -107,6 +107,7 @@ extern int errno;
 
 static int terminated_pipes;
 static int program_interrupted;
+static int childpipe[2] = {-1, -1};
 
 static int default_interval = 2000;
 
@@ -184,7 +185,25 @@ static void append_eta(char *info, double bw, long long tbytes)
 }
 
 
-static void ctrlc_handler(int sig)
+static void child_handler(int sig)
+{
+    char token = 0;
+    write(childpipe[1], &token, 1);
+}
+
+
+void close_pipe(struct pipe *p)
+{
+    terminated_pipes++;
+    p->terminated = 1;
+
+    /* Close output fd to cause EOF for the spawned process */
+    close(p->out_fd);
+    p->out_fd = -1;
+}
+
+
+static void ctrlc_and_pipe_handler(int sig)
 {
     if (sig == SIGINT)
 	program_interrupted = 1;
@@ -232,20 +251,12 @@ static void handle_pipe(struct pipe *p)
 
 	} else if (ret == 0) {
 	    /* Only pipe 0 can have regular files queued for it */
-	    if (p->id != 0 || open_new_file(p) == 0) {
-		terminated_pipes++;
-		p->terminated = 1;
+	    if (p->id != 0 || open_new_file(p) == 0)
+		close_pipe(p);
 
-		/* Close output fd to cause EOF for the spawned process */
-		close(p->out_fd);
-		p->out_fd = -1;
-	    }
-
-	} else {
-	    if (errno != EAGAIN && errno != EINTR) {
-		perror("pmr: Read error");
-		terminated_pipes = 2;
-	    }
+	} else if (errno != EAGAIN && errno != EINTR) {
+	    perror("pmr: Read error");
+	    close_pipe(p);
 	}
 
     } else {
@@ -263,15 +274,13 @@ static void handle_pipe(struct pipe *p)
 
 	} else if (ret == 0) {
 	    fprintf(stderr, "pmr: interesting: write returned 0\n");
-	    terminated_pipes = 2;
+	    close_pipe(p);
 	    return;
 
-	} else if (ret < 0) {
-	    if (errno != EINTR && errno != EAGAIN) {
-		perror("pmr: Write error");
-		terminated_pipes = 2;
-		return;
-	    }
+	} else if (errno != EINTR && errno != EAGAIN) {
+	    perror("pmr: Write error");
+	    close_pipe(p);
+	    return;
 	}
 
 	/* We only measure things for pipe 0 */
@@ -387,10 +396,10 @@ static int open_new_file(struct pipe *p)
 {
     char *fname;
 
-    close(p->in_fd);
-
     if (n_files_read == n_files)
 	return 0;
+
+    close(p->in_fd);
 
     fname = files[n_files_read++];
 
@@ -790,9 +799,7 @@ static void write_info(const char *info)
 
 int main(int argc, char **argv)
 {
-    struct sigaction act = {
-	.sa_handler = ctrlc_handler
-    };
+    struct sigaction act;
 
     int valid_time;
     struct timeval vot;
@@ -935,12 +942,22 @@ int main(int argc, char **argv)
     initialize_pipe(0, 0, 1);
 
     if (exec_arg_i > 0) {
+	/* Create a pipe to terminate select() in main loop from child
+	   signal handler */
+	if (pipe(childpipe)) {
+	    perror("Can not create a child pipe");
+	    exit(1);
+	}
+
+	act = (struct sigaction) {.sa_handler = child_handler};
+	sigaction(SIGCHLD, &act, NULL);
+
 	/* Pipe 1 is initialized here */
 	spawn_process((const char **) &argv[exec_arg_i]);
     }
 
-    /* Use non-blocking IO (select()) with > 1 pipes */
     if (n_pipes > 1) {
+	/* Use non-blocking IO (select()) with > 1 pipes */
 	for (i = 0; i < n_pipes; i++) {
 	    fcntl(pipes[i].in_fd, F_SETFL, O_NONBLOCK);
 	    fcntl(pipes[i].out_fd, F_SETFL, O_NONBLOCK);
@@ -951,8 +968,9 @@ int main(int argc, char **argv)
     valid_time = pipes[0].valid_time;
     vot = pipes[0].measurement_time;
 
-    sigaction(SIGPIPE, &act, 0);
-    sigaction(SIGINT, &act, 0);
+    act = (struct sigaction) {.sa_handler = ctrlc_and_pipe_handler};
+    sigaction(SIGPIPE, &act, NULL);
+    sigaction(SIGINT, &act, NULL);
 
     /* For ETA calculation when size was given with -s. This overrides
        byte size computed for regular file queue. */
@@ -973,12 +991,12 @@ int main(int argc, char **argv)
 	    continue;
 	}
 
-	/* We have 2 pipes */
-
 	FD_ZERO(&rfds);
 	FD_ZERO(&wfds);
 
 	maxfd = 0;
+
+	set_fd(&maxfd, childpipe[0], &rfds);
 
 	if (!pipes[0].terminated) {
 	    if (pipes[0].wbytes == pipes[0].rbytes)
@@ -1000,6 +1018,9 @@ int main(int argc, char **argv)
 	    perror("pmr: select() error");
 	    exit(1);
 	}
+
+	if (FD_ISSET(childpipe[0], &rfds))
+	    close_pipe(&pipes[0]);
 
 	if (!pipes[0].terminated) {
 	    if (FD_ISSET(pipes[0].in_fd, &rfds) ||
