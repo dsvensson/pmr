@@ -2,3 +2,5 @@
  - report time when transfer done
  - toggle units
  - programmable output format
+ - output buffering
+ - allow -l '100 KiB'
