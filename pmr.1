@@ -76,11 +76,11 @@ Use input buffer size of
 bytes
 
 .SH CONFIGURATION FILE
-pmr tries to read a configuration file at startup. It can be used to set a
-specific default behavior. pmr first tries to read it from
-$(HOME)/.pmr and second time from /etc/pmr. If configuration file is found,
-it is read line by line. Lines beginning with # are comment lines.
-Whitespace is ignored.
+pmr tries to read a configuration file at startup. It is used to set
+the default behavior. pmr first tries to read it from
+$(HOME)/.pmr, and then from /etc/pmr. If configuration file is found,
+it is read line by line. Lines beginning with # and empty lines are
+ignored. Whitespace is ignored.
 
 A line can contain 0 or 1 directives. Valid directives are:
 .br
@@ -116,7 +116,7 @@ Generate lots of context switches:
 pmr < /dev/zero |cat > /dev/null
 
 .ft R
-Or optionally, use spawning mode:
+Or optionally, use spawning mode (total waste for this case):
 .ft B
 pmr -e cat < /dev/zero > /dev/null
 

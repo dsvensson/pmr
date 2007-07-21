@@ -3,4 +3,4 @@
  - toggle units
  - programmable output format
  - output buffering
- - allow -l '100 KiB'
+ - select which pipe to limit in -e mode

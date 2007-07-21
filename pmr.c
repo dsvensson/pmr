@@ -356,6 +356,10 @@ static double inverse_size_transformation(const char *valuestr)
     int i;
 
     value = strtod(valuestr, &endptr);
+
+    while (*endptr != 0 && isspace(*endptr))
+	endptr++;
+
     if (*endptr == 0)
 	return value;
 
@@ -418,11 +422,11 @@ static int open_new_file(struct pipe *p)
 static void print_usage(const char *pname)
 {
     fprintf(stderr, "pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n\nUsage:\n\n", VERSION);
-    fprintf(stderr, " %s [-l Bps] [-s size] [-m] [-e com] [-t seconds] [-b size] [-r] [-v] FILE ..\n\n",
+    fprintf(stderr, " %s [-l Bps] [-s size] [-m] [-t seconds] [-b size] [-r] [-v] [-e com | FILE ..]\n\n",
 	    pname);
-    fprintf(stderr, " -b size\tset input buffer size (default %d)\n", DEFAULT_BUFFER_SIZE);
+    fprintf(stderr, " -b size\tSet input buffer size (default %d)\n", DEFAULT_BUFFER_SIZE);
     fprintf(stderr,
-	    " -e com args\tRun command \"com\" with args, copy stdin of pmr to the stdin of\n"
+	    " -e com args..\tRun command \"com\" with args, copy stdin of pmr to the stdin of\n"
 	    "\t\tthe command, and copy stdout of the command to the stdout of\n"
 	    "\t\tpmr. pmr acts as a measuring filter between the shell and\n"
 	    "\t\tthe command.\n"
@@ -685,7 +689,7 @@ void spawn_process(const char **args)
 	    exit(1);
 	}
 
-	execv(args[0], (char * const *) args);
+	execvp(args[0], (char * const *) args);
 
 	fprintf(stderr, "pmr: can not execute %s (%s)\n",
 		args[0], strerror(errno));
@@ -850,8 +854,6 @@ int main(int argc, char **argv)
 	    }
 
 	    exec_arg_i = i + 1; /* store the index of command and its args */
-
-	    fprintf(stderr, "pmr warning: -e option is totally broken.\n");
 	    break;
 	}
 
