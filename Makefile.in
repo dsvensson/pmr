@@ -17,7 +17,7 @@ install:	pmr
 	install pmr.1 {PREFIX}/man/man1/
 
 check:	pmr
-	dd if=/dev/zero bs=1000000 count=7 |./pmr -l 1000000 > /dev/zero
+	./check.sh
 
 mydist:
 	mkdir -p dist

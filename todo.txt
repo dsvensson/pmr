@@ -4,3 +4,5 @@
  - programmable output format
  - output buffering
  - select which pipe to limit in -e mode
+ - add range support (does not affect bandwidth prints!)
+ - Improve bandwidth reporting with rate limit modes

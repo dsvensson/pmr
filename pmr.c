@@ -63,6 +63,13 @@ static size_t buffer_size = DEFAULT_BUFFER_SIZE;
 #endif
 
 
+struct range {
+    int valid;
+    long long start;
+    long long end;
+};
+
+
 struct pipe {
     int id;
 
@@ -87,6 +94,8 @@ struct pipe {
     int rate_read_bytes;
 
     MD5_CTX md5ctx;
+
+    struct range range;
 };
 
 
@@ -217,14 +226,98 @@ static int get_bw_limit(const char *limit)
     double value = inverse_size_transformation(limit);
 
     if (value < 1) {
-	fprintf(stderr, "illegal bytes per second value (%s)\n", limit);
+	fprintf(stderr, "illegal bytes per second value (%s -> %lf)\n", limit, value);
 	exit(1);
     } else if (value >= 2147483648UL) {
-	fprintf(stderr, "too high bytes per second value (%s)\n", limit);
+	fprintf(stderr, "too high bytes per second value (%s -> %lf)\n", limit, value);
 	exit(1);
     }
 
     return (int) value;
+}
+
+
+static void get_range(struct range *r, const char *parameter)
+{
+    char *delimiter, *s;
+    double start, end;
+
+    s = strdup(parameter);
+    if (s == NULL) {
+	fprintf(stderr, "Not enough memory for range parameter.\n");
+	exit(1);
+    }
+
+    delimiter = strchr(s, ':');
+    if (delimiter == NULL) {
+	fprintf(stderr, "Invalid range parameter, missing : character\n");
+	exit(1);
+    }
+
+    *delimiter = 0;
+
+    start = inverse_size_transformation(s);
+    end = inverse_size_transformation(delimiter + 1);
+
+    if (start < 0) {
+	if (s[0] == 0) {
+	    start = 0;
+	} else {
+	    fprintf(stderr, "Invalid beginning of range %s\n", parameter);
+	    exit(1);
+	}
+    }
+
+    if (end < 0) {
+	if (strcasecmp(delimiter + 1, "inf") == 0 || delimiter[1] == 0) {
+	    end = -1;
+	} else {
+	    fprintf(stderr, "Invalid end of range %s\n", parameter);
+	    exit(1);
+	}
+    }
+
+    if (start > 0 && end > 0 && end < start) {
+	fprintf(stderr, "Range end must be greater than start.\n");
+	exit(1);
+    }
+
+    r->start = start;
+    r->end = end;
+    r->valid = 1;
+
+    free(s);
+}
+
+
+static ssize_t write_to_pipe(struct pipe *p, const char *buf, size_t count)
+{
+    ssize_t ret;
+
+    if (p->range.valid && p->range.start > 0) {
+	if (p->range.start >= count) {
+	    /* No write, just decrease the number of bytes to be skipped */
+	    p->range.start -= count;
+	    ret = count;
+	} else {
+	    /* Partial write */
+	    size_t towrite = count - p->range.start;
+
+	    ret = write(p->out_fd, buf + p->range.start, towrite);
+
+	    if (ret <= 0)
+		return ret;
+
+	    ret += p->range.start;
+
+	    p->range.start = 0;
+	}
+    } else {
+	/* Nothing to skip */
+	ret = write(p->out_fd, buf, count);
+    }
+
+    return ret;
 }
 
 
@@ -234,6 +327,7 @@ static void handle_pipe(struct pipe *p)
     void *rdata;
     double bw;
     char info[256];
+    size_t towrite;
 
     if (p->rbytes == p->wbytes) {
 
@@ -262,8 +356,10 @@ static void handle_pipe(struct pipe *p)
 
     } else {
 
+	towrite = p->rbytes - p->wbytes;
 	rdata = &p->aligned_buf[p->readoffs];
-	ret = write(p->out_fd, rdata, p->rbytes - p->wbytes);
+
+	ret = write_to_pipe(p, rdata, towrite);
 
 	if (ret > 0) {
 	    p->wbytes += ret;
@@ -356,6 +452,9 @@ static double inverse_size_transformation(const char *valuestr)
     int i;
 
     value = strtod(valuestr, &endptr);
+
+    if (endptr == valuestr)
+	return -1.0;
 
     while (*endptr != 0 && isspace(*endptr))
 	endptr++;
@@ -804,6 +903,9 @@ int main(int argc, char **argv)
     double presize = 0.0;
     int exec_arg_i = -1;
 
+    struct range rangeparameters[2] = {{.valid = 0},
+				       {.valid = 0}};
+
     read_config();
 
     for (i = 1; i < argc;) {
@@ -862,6 +964,16 @@ int main(int argc, char **argv)
 	    exit(0);
 	}
 
+	if (!strcmp(argv[i], "-i") || !strcmp(argv[i], "--input-range")) {
+	    if ((i + 1) >= argc) {
+		fprintf(stderr, "Not enough args. Missing range.\n");
+		exit(1);
+	    }
+	    get_range(&rangeparameters[0], argv[i + 1]);
+	    i += 2;
+	    continue;
+	}
+
 	if (!strcmp(argv[i], "-l")) {
 	    if ((i + 1) < argc) {
 		default_max_rate = get_bw_limit(argv[i + 1]);
@@ -877,6 +989,16 @@ int main(int argc, char **argv)
 	if (!strcmp(argv[i], "-m") || !strcmp(argv[i], "--md5")) {
 	    use_md5 = 1;
 	    i++;
+	    continue;
+	}
+
+	if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output-range")) {
+	    if ((i + 1) >= argc) {
+		fprintf(stderr, "Not enough args. Missing range.\n");
+		exit(1);
+	    }
+	    get_range(&rangeparameters[1], argv[i + 1]);
+	    i += 2;
 	    continue;
 	}
 
@@ -971,6 +1093,18 @@ int main(int argc, char **argv)
     /* Open the first file in the regular file queue */
     if (n_files > 0)
 	open_new_file(&pipes[0]);
+
+    /* Set pipe ranges */
+    if (rangeparameters[0].valid)
+	pipes[0].range = rangeparameters[0];
+
+    if (rangeparameters[1].valid) {
+	if (n_pipes == 1) {
+	    fprintf(stderr, "Output range may only be used in -e mode\n");
+	    exit(1);
+	}
+	pipes[1].range = rangeparameters[1];
+    }
 
     while (terminated_pipes < n_pipes) {
 	fd_set rfds, wfds;
