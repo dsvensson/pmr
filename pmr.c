@@ -25,9 +25,13 @@
 
 #include "md5.h"
 
+
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
+
+
+#define MIN(x, y) ((x) <= (y) ? (x) : (y))
 
 
 #define darray_append(n, nallocated, array, item) do { \
@@ -277,8 +281,8 @@ static void get_range(struct range *r, const char *parameter)
 	}
     }
 
-    if (start > 0 && end > 0 && end < start) {
-	fprintf(stderr, "Range end must be greater than start.\n");
+    if (start >= 0 && end >= 0 && end < start) {
+	fprintf(stderr, "Range end must be at least the same as start\n");
 	exit(1);
     }
 
@@ -294,30 +298,37 @@ static ssize_t write_to_pipe(struct pipe *p, const char *buf, size_t count)
 {
     ssize_t ret;
 
-    if (p->range.valid && p->range.start > 0) {
-	if (p->range.start >= count) {
-	    /* No write, just decrease the number of bytes to be skipped */
-	    p->range.start -= count;
-	    ret = count;
-	} else {
-	    /* Partial write */
-	    size_t towrite = count - p->range.start;
+    if (p->range.valid) {
 
-	    ret = write(p->out_fd, buf + p->range.start, towrite);
+	/* Notice that because range.end >= initial range.start, we will
+	   never handle both the start and the end range here */
 
-	    if (ret <= 0)
-		return ret;
-
-	    ret += p->range.start;
-
-	    p->range.start = 0;
+	if (p->range.start > 0) {
+	    /* Skip bytes */
+	    ret = MIN(p->range.start, count);
+	    p->range.start -= ret;
+	    return ret;
 	}
-    } else {
-	/* Nothing to skip */
-	ret = write(p->out_fd, buf, count);
+
+	if (p->range.end > 0) {
+	    /* Test write end range */
+	    if (p->wbytes + count >= p->range.end) {
+		/* Partial write */
+		size_t maxwrite = p->range.end - p->wbytes;
+
+		ret = write(p->out_fd, buf, maxwrite);
+
+		/* If end range is reached, close the pipe */
+		if (ret == maxwrite)
+		    close_pipe(p);
+
+		return ret;
+	    }
+	}
     }
 
-    return ret;
+    /* The normal case: full write */
+    return write(p->out_fd, buf, count);
 }
 
 
@@ -331,7 +342,9 @@ static void handle_pipe(struct pipe *p)
 
     if (p->rbytes == p->wbytes) {
 
-	if (p->max_rate == -1)
+	if (p->range.valid && p->range.end >= 0 && (p->rbytes == p->range.end)) {
+	    ret = 0;
+	} else if (p->max_rate == -1)
 	    ret = read_no_rate_limit(p);
 	else
 	    ret = read_rate_limit(p);
