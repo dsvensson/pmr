@@ -534,20 +534,31 @@ static int open_new_file(struct pipe *p)
 static void print_usage(const char *pname)
 {
     fprintf(stderr, "pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n\nUsage:\n\n", VERSION);
-    fprintf(stderr, " %s [-l Bps] [-s size] [-m] [-t seconds] [-b size] [-r] [-v] [-e com | FILE ..]\n\n",
+    fprintf(stderr, " %s [-l Bps] [-s size] [-m] [-t seconds] [-b size] [-i R] [-o R] [-r] [-v] [-e com | FILE ..]\n\n",
 	    pname);
     fprintf(stderr, " -b size\tSet input buffer size (default %d)\n", DEFAULT_BUFFER_SIZE);
     fprintf(stderr,
 	    " -e com args..\tRun command \"com\" with args, copy stdin of pmr to the stdin of\n"
 	    "\t\tthe command, and copy stdout of the command to the stdout of\n"
 	    "\t\tpmr. pmr acts as a measuring filter between the shell and\n"
-	    "\t\tthe command.\n"
+	    "\t\tthe command. Note that this option changes the behavior of -i.\n"
+	    " -i R / --input-range R    R is in format x:y, where x is the number of bytes\n"
+	    "                to be skipped in the beginning of standard input, and y is the\n"
+	    "                total number of bytes to be written to standard output.\n"
+	    "                The behavior is different in -e mode. Instead of limiting\n"
+	    "                writes to standard output, this limits writes to the process.\n"
+
+
 	    " -l Bps\t\tLimit throughput to 'Bps' bytes per second. It is also\n"
 	    "\t\tpossible to use SI, IEC 60027 and bit units in the value.\n"
 	    "\t\tSI units include kB, MB, ..., IEC units include KiB, MiB, ...\n"
 	    "\t\tand bit units include kbit, Mbit, ...\n"
 	    " -m / --md5\tCompute an md5 checksum of the stream (useful for verifying\n"
 	    "\t\tdata integrity through TCP networks)\n"
+	    " -o R / --output-range R    Similar to --i / --input-range, but only has an\n"
+	    "                effect in -e mode. This can be used to skip data from the\n"
+	    "                executed process, and limit the total number of data written\n"
+	    "                to standard output.\n"
 	    " -r\t\tUse carriage return on output, no newline\n"
 	    " -s size\tCalculate ETA given a size estimate. Giving regular files\n"
 	    "\t\tas pmr parameters implies -s SUM, where SUM is the total\n"

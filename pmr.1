@@ -1,11 +1,11 @@
-.TH pmr 1 "2006-11-03" Linux "user commands"
+.TH pmr 1 "2007-08-22" Linux "user commands"
 
 .SH NAME
 pmr \- command line pipe measurement tool for Unixes
 
 .SH SYNTAX
 .B pmr
-[\fB-l Bps\fR] [\fB-s size\fR] [\fB-m\fR] [\fB-e com\fR] [\fB-r\fR] [\fB-t secs\fR] [\fB-b size\fR] [\fB-v\fR] FILE ...
+[\fB-l Bps\fR] [\fB-s size\fR] [\fB-m\fR] [-i R] [-o R] [\fB-r\fR] [\fB-t secs\fR] [\fB-b size\fR] [\fB-v\fR] [\fB-e com\fR | FILE ...]
 
 .SH VERSION
 This man page documents pmr version 0.13 and maybe later.
@@ -37,6 +37,13 @@ shell and the command.
 .B \-h
 Display help
 .TP
+.B \-i R / \-\-input\-range R
+R is in format x:y, where x is the number of bytes to be skipped in
+the beginning of standard input, and y is the total number of bytes to
+be written to standard output.  The behavior is different in -e
+mode. Instead of limiting writes to standard output, this limits
+writes to the process.
+.TP
 .B \-l Bps
 Limit throughput to a given bytes per second rate
 .I Bps .
@@ -52,6 +59,11 @@ An example: pmr -l 64KiB < /dev/zero > /dev/null
 .TP
 .B \-m / \-\-md5
 Compute an md5 checksum of the stream. This is useful for verifying data integrity through TCP networks.
+.TP
+.B \-o R / \-\-output\-range R
+Similar to --i / --input-range, but only has an effect in -e
+mode. This can be used to skip data read from the executed process, and
+limit the total number of data written to standard output.
 .TP
 .B \-r
 Don't print new lines on output, use carriage return
