@@ -116,8 +116,6 @@ static int timetest(double *bw, char *s, size_t maxlen, struct pipe *p,
 static void write_info(const char *info);
 
 
-extern int errno;
-
 static int terminated_pipes;
 static int program_return_value = EXIT_SUCCESS;
 static int childpipe[2] = {-1, -1};
@@ -130,7 +128,7 @@ static int default_max_rate = -1;
 
 static int n_pipes;
 
-struct pipe pipes[2];
+static struct pipe pipes[2];
 
 static size_t n_files;
 static size_t n_files_read;
@@ -205,7 +203,7 @@ static void child_handler(int sig)
 }
 
 
-void close_pipe(struct pipe *p)
+static void close_pipe(struct pipe *p)
 {
     terminated_pipes++;
     p->terminated = 1;
@@ -444,7 +442,7 @@ static void initialize_pipe(int id, int in_fd, int out_fd)
     p->aligned_buf += PAGE_SIZE - (((long) p->aligned_buf) & (PAGE_SIZE - 1));
 
     p->valid_time = 1;
-    if (gettimeofday(&p->rate_time, 0)) {
+    if (gettimeofday(&p->rate_time, NULL)) {
 	perror("pmr: gettimeofday failed");
 	p->valid_time = 0;
     }
@@ -671,7 +669,7 @@ static int read_rate_limit(struct pipe *p)
     if (p->max_rate == -1)
 	return read_no_rate_limit(p);
 
-    if (gettimeofday(&new_rate_time, 0)) {
+    if (gettimeofday(&new_rate_time, NULL)) {
 	perror("pmr: gettimeofday failed. can not limit rate. going max speed.");
 	p->max_rate = -1;
 	return read_no_rate_limit(p);
@@ -694,7 +692,7 @@ static int read_rate_limit(struct pipe *p)
 	}
 	if (t < 1000) {
 	    usleep(1000000 - 1000 * t);
-	    if (gettimeofday(&new_rate_time, 0)) {
+	    if (gettimeofday(&new_rate_time, NULL)) {
 		perror("pmr: gettimeofday failed. can not limit rate. going "
 		       "max speed.");
 		p->max_rate = -1;
@@ -792,7 +790,7 @@ static int skip_nws(const char *line, int ind)
 }
 
 
-void spawn_process(const char **args)
+static void spawn_process(const char **args)
 {
     int toprocess[2];
     int fromprocess[2];
@@ -842,7 +840,7 @@ static int timetest(double *bw, char *s, size_t maxlen, struct pipe *p,
 
     strcpy(s, "bandwidth: NaN");
 
-    if (gettimeofday(&nt, 0)) {
+    if (gettimeofday(&nt, NULL)) {
 	/* time failed. bandwidth = NaN. return false. */
 	return 0;
     }

@@ -1,4 +1,4 @@
-CC = gcc
+CC = {CC}
 CFLAGS = -Wall -O2
 
 pmr:	pmr.o md5c.o

@@ -25,8 +25,16 @@ if test ! -z "$packageprefix" ; then
     prefix="$packageprefix/$prefix"
 fi
 
-sed -e "s|{PREFIX}|$prefix|g" < Makefile.in > Makefile
+if test -z "$CC" ; then
+    CC=gcc
+fi
 
-echo "Would install pipemeter binary to directory $prefix/bin."
-echo ""
-echo "Configure succesful."
+sed -e "s|{PREFIX}|$prefix|g" \
+    -e "s|{CC}|$CC|g" \
+    < Makefile.in > Makefile
+
+echo
+echo "Install path:    $prefix/bin"
+echo "Compiler:        $CC"
+echo
+echo "Configure successful"
