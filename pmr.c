@@ -596,10 +596,13 @@ static void read_config(void)
     }
 
     while (1) {
-
 	lineret = fgets(line, sizeof line, cfile);
-	if (lineret == NULL)
-	    break;
+	if (lineret == NULL) {
+	    if (feof(cfile))
+		break;
+	    continue;
+	}
+
 	if (line[0] == '#')
 	    continue;		/* comment line */
 
