@@ -575,7 +575,6 @@ static void read_config(void)
     char *word, *opt;
     int t;
     int ret;
-    char *lineret;
 
     /* First try home directory */
     home = getenv("HOME");
@@ -596,9 +595,8 @@ static void read_config(void)
     }
 
     while (1) {
-	lineret = fgets(line, sizeof line, cfile);
-	if (lineret == NULL) {
-	    if (feof(cfile))
+	if (fgets(line, sizeof line, cfile) == NULL) {
+	    if (feof(cfile) || ferror(cfile))
 		break;
 	    continue;
 	}
