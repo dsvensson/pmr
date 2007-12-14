@@ -3,7 +3,7 @@
 
    Get latest version of pmr from: http://www.iki.fi/shd/foss/pmr/
 
-   Pmr displays the bandwidth of the pipe going through the process.
+   pmr displays the bandwidth of the pipe going through the process.
 */
 
 #define _LARGEFILE64_SOURCE
@@ -25,83 +25,78 @@
 
 #include "md5.h"
 
-
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
 
+#define die(fmt, args...) do { fprintf(stderr, "pmr: " fmt, ## args); exit(1); } while(0)
+
+#define dieerror(fmt, args...) do { fprintf(stderr, "pmr: " fmt ": %s\n", ## args, strerror(errno)); exit(1); } while(0)
 
 #define MIN(x, y) ((x) <= (y) ? (x) : (y))
 
-
 #define darray_append(n, nallocated, array, item) do { \
-    assert((n) >= 0); \
-    assert((nallocated) >= 0); \
-    assert((n) <= (nallocated)); \
-                                 \
-    if ((n) == (nallocated)) { \
-      if ((nallocated) == 0) \
-        (nallocated) = 1; \
-      (nallocated) *= 2; \
-      assert((nallocated) > 0); \
-      (array) = realloc((array), (nallocated) * sizeof((array)[0])); \
-      if ((array) == NULL) { \
-        fprintf(stderr, "no memory for darray elements\n"); \
-        exit(1); \
-      } \
-    } \
-      \
-    (array)[(n)] = (item); \
-    (n)++; \
-  } while (0)
-
+	assert((n) >= 0); \
+	assert((nallocated) >= 0); \
+	assert((n) <= (nallocated)); \
+					\
+	if ((n) == (nallocated)) { \
+		if ((nallocated) == 0) \
+			(nallocated) = 1; \
+		(nallocated) *= 2; \
+		assert((nallocated) > 0); \
+		(array) = realloc((array), (nallocated) * sizeof((array)[0])); \
+		if ((array) == NULL) { \
+			die("No memory for darray elements\n"); \
+		} \
+	} \
+		\
+	(array)[(n)] = (item); \
+	(n)++; \
+} while (0)
 
 #define VERSION "0.13"
 
 #define DEFAULT_BUFFER_SIZE 8192
 static size_t buffer_size = DEFAULT_BUFFER_SIZE;
 
-
 #ifndef PAGE_SIZE
 #define PAGE_SIZE 8192
 #endif
 
-
 struct range {
-    int valid;
-    long long start;
-    long long end;
+	int valid;
+	long long start;
+	long long end;
 };
-
 
 struct pipe {
-    int id;
+	int id;
 
-    int terminated;
+	int terminated;
 
-    int in_fd;
-    int out_fd;
+	int in_fd;
+	int out_fd;
 
-    char *real_buf;
-    char *aligned_buf;
+	char *real_buf;
+	char *aligned_buf;
 
-    int readoffs;
-    long long rbytes; /* bytes read */
-    long long wbytes; /* bytes written */
+	int readoffs;
+	long long rbytes;	/* bytes read */
+	long long wbytes;	/* bytes written */
 
-    struct timeval measurement_time;
-    long long measurement_bytes;
+	struct timeval measurement_time;
+	long long measurement_bytes;
 
-    int max_rate; /* -1 if no rate is not used */
-    int valid_time;
-    struct timeval rate_time;
-    int rate_read_bytes;
+	int max_rate;		/* -1 if no rate is not used */
+	int valid_time;
+	struct timeval rate_time;
+	int rate_read_bytes;
 
-    MD5_CTX md5ctx;
+	MD5_CTX md5ctx;
 
-    struct range range;
+	struct range range;
 };
-
 
 static void initialize_pipe(int id, int in_fd, int out_fd);
 static double inverse_size_transformation(const char *valuestr);
@@ -115,10 +110,9 @@ static int timetest(double *bw, char *s, size_t maxlen, struct pipe *p,
 		    int force);
 static void write_info(const char *info);
 
-
 static int terminated_pipes;
 static int program_return_value = EXIT_SUCCESS;
-static int childpipe[2] = {-1, -1};
+static int childpipe[2] = { -1, -1 };
 
 static int default_interval = 2000;
 
@@ -144,1087 +138,1056 @@ static char space[SPACE_LENGTH];
 static int old_line_length;
 static int use_carriage_return;
 
-
 #define NUNITS (9)
 
-static const char *iec_units[NUNITS] = {"B", "KiB", "MiB", "GiB", "TiB",
-					"PiB", "EiB", "ZiB", "YiB"};
+static const char *iec_units[NUNITS] = { "B", "KiB", "MiB", "GiB", "TiB",
+	"PiB", "EiB", "ZiB", "YiB"
+};
 
-static const char *si_units[NUNITS] = {"B", "kB", "MB", "GB", "TB",
-				       "PB", "EB", "ZB", "YB"};
+static const char *si_units[NUNITS] = { "B", "kB", "MB", "GB", "TB",
+	"PB", "EB", "ZB", "YB"
+};
 
-static const char *bit_units[NUNITS] = {"b", "kbit", "Mbit", "Gbit", "Tbit",
-					"Pbit", "Ebit", "Zbit", "Ybit"};
-
+static const char *bit_units[NUNITS] = { "b", "kbit", "Mbit", "Gbit", "Tbit",
+	"Pbit", "Ebit", "Zbit", "Ybit"
+};
 
 static void append_eta(char *info, double bw, long long tbytes)
 {
-    int i;
-    double sum = 0.0;
-    int nvalid = 0;
-    long long bytesleft;
-    char str[256];
+	int i;
+	double sum = 0.0;
+	int nvalid = 0;
+	long long bytesleft;
+	char str[256];
 
-    /* Compute a speed estimate. The estimate is an average of N previous
-       speeds. */
-    for (i = 1; i < SPEED_WINDOW_SIZE; i++) {
-	double s = speed_window[i - 1];
-	speed_window[i] = s;
-	sum += s;
-	if (s > 0.0)
-	    nvalid++;
-    }
+	/* Compute a speed estimate. The estimate is an average of N previous
+	   speeds. */
+	for (i = 1; i < SPEED_WINDOW_SIZE; i++) {
+		double s = speed_window[i - 1];
+		speed_window[i] = s;
+		sum += s;
+		if (s > 0.0)
+			nvalid++;
+	}
 
-    speed_window[0] = bw;
-    sum += bw;
-    if (bw > 0.0)
-	nvalid++;
+	speed_window[0] = bw;
+	sum += bw;
+	if (bw > 0.0)
+		nvalid++;
 
-    if (nvalid == 0)
-	return;
+	if (nvalid == 0)
+		return;
 
-    bytesleft = estimatedbytes - tbytes;
-    if (bytesleft < 0) {
-	sprintf(str, "\tETA: -");
-    } else {
-	double eta = bytesleft / (sum / nvalid);
+	bytesleft = estimatedbytes - tbytes;
+	if (bytesleft < 0) {
+		sprintf(str, "\tETA: -");
+	} else {
+		double eta = bytesleft / (sum / nvalid);
 
-	sprintf(str, "\tETA: %.1fs", eta);
-    }
+		sprintf(str, "\tETA: %.1fs", eta);
+	}
 
-    strcat(info, str);
+	strcat(info, str);
 }
-
 
 static void child_handler(int sig)
 {
-    char token = 0;
-    write(childpipe[1], &token, 1);
+	char token = 0;
+	write(childpipe[1], &token, 1);
 }
-
 
 static void close_pipe(struct pipe *p)
 {
-    terminated_pipes++;
-    p->terminated = 1;
+	terminated_pipes++;
+	p->terminated = 1;
 
-    /* Close output fd to cause EOF for the spawned process */
-    close(p->out_fd);
-    p->out_fd = -1;
+	/* Close output fd to cause EOF for the spawned process */
+	close(p->out_fd);
+	p->out_fd = -1;
 }
-
 
 static void ctrlc_and_pipe_handler(int sig)
 {
-    if (sig == SIGINT)
-	program_return_value = 1;
+	if (sig == SIGINT)
+		program_return_value = 1;
 
-    terminated_pipes = 2;
+	terminated_pipes = 2;
 }
-
 
 static int get_bw_limit(const char *limit)
 {
-    double value = inverse_size_transformation(limit);
+	double value = inverse_size_transformation(limit);
 
-    if (value < 1) {
-	fprintf(stderr, "illegal bytes per second value (%s -> %lf)\n", limit, value);
-	exit(1);
-    } else if (value >= 2147483648UL) {
-	fprintf(stderr, "too high bytes per second value (%s -> %lf)\n", limit, value);
-	exit(1);
-    }
+	if (value < 1) {
+		die("Invalid bytes per second value (%s -> %lf)\n",
+		    limit, value);
+	} else if (value >= 2147483648UL) {
+		die("Too high bytes per second value (%s -> %lf)\n",
+		    limit, value);
+	}
 
-    return (int) value;
+	return (int)value;
 }
-
 
 static void get_range(struct range *r, const char *parameter)
 {
-    char *delimiter, *s;
-    double start, end;
+	char *delimiter, *s;
+	double start, end;
 
-    s = strdup(parameter);
-    if (s == NULL) {
-	fprintf(stderr, "Not enough memory for range parameter.\n");
-	exit(1);
-    }
+	s = strdup(parameter);
+	if (s == NULL)
+		die("Not enough memory for range parameter.\n");
 
-    delimiter = strchr(s, ':');
-    if (delimiter == NULL) {
-	fprintf(stderr, "Invalid range parameter, missing : character\n");
-	exit(1);
-    }
+	delimiter = strchr(s, ':');
+	if (delimiter == NULL)
+		die("Invalid range parameter, missing : character\n");
 
-    *delimiter = 0;
+	*delimiter = 0;
 
-    start = inverse_size_transformation(s);
-    end = inverse_size_transformation(delimiter + 1);
+	start = inverse_size_transformation(s);
+	end = inverse_size_transformation(delimiter + 1);
 
-    if (start < 0) {
-	if (s[0] == 0) {
-	    start = 0;
-	} else {
-	    fprintf(stderr, "Invalid beginning of range %s\n", parameter);
-	    exit(1);
+	if (start < 0) {
+		if (s[0] == 0) {
+			start = 0;
+		} else {
+			die("Invalid beginning of range %s\n", parameter);
+		}
 	}
-    }
 
-    if (end < 0) {
-	if (strcasecmp(delimiter + 1, "inf") == 0 || delimiter[1] == 0) {
-	    end = -1;
-	} else {
-	    fprintf(stderr, "Invalid end of range %s\n", parameter);
-	    exit(1);
+	if (end < 0) {
+		if (strcasecmp(delimiter + 1, "inf") == 0 || delimiter[1] == 0) {
+			end = -1;
+		} else {
+			die("Invalid end of range %s\n", parameter);
+		}
 	}
-    }
 
-    if (start >= 0 && end >= 0 && end < start) {
-	fprintf(stderr, "Range end must be at least the same as start\n");
-	exit(1);
-    }
+	if (start >= 0 && end >= 0 && end < start)
+		die("Range end must be at least the same as start\n");
 
-    r->start = start;
-    r->end = end;
-    r->valid = 1;
+	r->start = start;
+	r->end = end;
+	r->valid = 1;
 
-    free(s);
+	free(s);
 }
-
 
 static ssize_t write_to_pipe(struct pipe *p, const char *buf, size_t count)
 {
-    ssize_t ret;
+	ssize_t ret;
 
-    if (p->range.valid) {
+	if (p->range.valid) {
 
-	/* Notice that because range.end >= initial range.start, we will
-	   never handle both the start and the end range here */
+		/* Notice that because range.end >= initial range.start, we will
+		   never handle both the start and the end range here */
 
-	if (p->range.start > 0) {
-	    /* Skip bytes */
-	    ret = MIN(p->range.start, count);
-	    p->range.start -= ret;
-	    return ret;
+		if (p->range.start > 0) {
+			/* Skip bytes */
+			ret = MIN(p->range.start, count);
+			p->range.start -= ret;
+			return ret;
+		}
+
+		if (p->range.end > 0) {
+			/* Test write end range */
+			if (p->wbytes + count >= p->range.end) {
+				/* Partial write */
+				size_t maxwrite = p->range.end - p->wbytes;
+
+				ret = write(p->out_fd, buf, maxwrite);
+
+				/* If end range is reached, close the pipe */
+				if (ret == maxwrite)
+					close_pipe(p);
+
+				return ret;
+			}
+		}
 	}
 
-	if (p->range.end > 0) {
-	    /* Test write end range */
-	    if (p->wbytes + count >= p->range.end) {
-		/* Partial write */
-		size_t maxwrite = p->range.end - p->wbytes;
-
-		ret = write(p->out_fd, buf, maxwrite);
-
-		/* If end range is reached, close the pipe */
-		if (ret == maxwrite)
-		    close_pipe(p);
-
-		return ret;
-	    }
-	}
-    }
-
-    /* The normal case: full write */
-    return write(p->out_fd, buf, count);
+	/* The normal case: full write */
+	return write(p->out_fd, buf, count);
 }
-
 
 static void handle_pipe(struct pipe *p)
 {
-    ssize_t ret;
-    void *rdata;
-    double bw;
-    char info[256];
-    size_t towrite;
+	ssize_t ret;
+	void *rdata;
+	double bw;
+	char info[256];
+	size_t towrite;
 
-    if (p->rbytes == p->wbytes) {
+	if (p->rbytes == p->wbytes) {
 
-	if (p->range.valid && p->range.end >= 0 && (p->rbytes == p->range.end)) {
-	    ret = 0;
-	} else if (p->max_rate == -1)
-	    ret = read_no_rate_limit(p);
-	else
-	    ret = read_rate_limit(p);
+		if (p->range.valid && p->range.end >= 0
+		    && (p->rbytes == p->range.end)) {
+			ret = 0;
+		} else if (p->max_rate == -1)
+			ret = read_no_rate_limit(p);
+		else
+			ret = read_rate_limit(p);
 
-	/* Note, we will try to write all data received so far even if the
-	   program has been aborted (SIGINT) */
+		/* Note, we will try to write all data received so far even if the
+		   program has been aborted (SIGINT) */
 
-	if (ret > 0) {
-	    p->rbytes += ret;
-	    p->readoffs = 0;
+		if (ret > 0) {
+			p->rbytes += ret;
+			p->readoffs = 0;
 
-	} else if (ret == 0) {
-	    /* Only pipe 0 can have regular files queued for it */
-	    if (p->id != 0 || open_new_file(p) == 0)
-		close_pipe(p);
+		} else if (ret == 0) {
+			/* Only pipe 0 can have regular files queued for it */
+			if (p->id != 0 || open_new_file(p) == 0)
+				close_pipe(p);
 
-	} else if (errno != EAGAIN && errno != EINTR) {
-	    perror("pmr: Read error");
-	    close_pipe(p);
-	    program_return_value = 1;
+		} else if (errno != EAGAIN && errno != EINTR) {
+			perror("pmr: Read error");
+			close_pipe(p);
+			program_return_value = 1;
+		}
+
+	} else {
+
+		towrite = p->rbytes - p->wbytes;
+		rdata = &p->aligned_buf[p->readoffs];
+
+		ret = write_to_pipe(p, rdata, towrite);
+
+		if (ret > 0) {
+			p->wbytes += ret;
+			p->measurement_bytes += ret;
+			p->readoffs += ret;
+
+			if (use_md5)
+				MD5Update(&p->md5ctx,
+					  (unsigned char *)p->aligned_buf, ret);
+
+		} else if (ret == 0) {
+			fprintf(stderr, "pmr: interesting: write returned 0\n");
+			close_pipe(p);
+			return;
+
+		} else if (errno != EINTR && errno != EAGAIN) {
+			perror("pmr: Write error");
+			close_pipe(p);
+			program_return_value = 1;
+			return;
+		}
+
+		/* We only measure things for pipe 0 */
+		if (p->id == 0 && p->valid_time &&
+		    timetest(&bw, info, sizeof(info), p, 0)) {
+
+			char byte_info[256];
+			char unit[16];
+			double total;
+
+			size_transformation(&total, unit, p->wbytes);
+			sprintf(byte_info, "\ttotal: %.2f %s (%lld bytes)",
+				total, unit, p->wbytes);
+
+			if (estimatedbytes > 0)
+				append_eta(byte_info, bw, p->wbytes);
+
+			/* A check for just being pedantic. info[] is always long enough */
+			if ((strlen(info) + strlen(byte_info) + 1) <=
+			    sizeof(info)) {
+				strcat(info, byte_info);
+				write_info(info);
+			}
+		}
 	}
-
-    } else {
-
-	towrite = p->rbytes - p->wbytes;
-	rdata = &p->aligned_buf[p->readoffs];
-
-	ret = write_to_pipe(p, rdata, towrite);
-
-	if (ret > 0) {
-	    p->wbytes += ret;
-	    p->measurement_bytes += ret;
-	    p->readoffs += ret;
-
-	    if (use_md5)
-		MD5Update(&p->md5ctx, (unsigned char *) p->aligned_buf, ret);
-
-	} else if (ret == 0) {
-	    fprintf(stderr, "pmr: interesting: write returned 0\n");
-	    close_pipe(p);
-	    return;
-
-	} else if (errno != EINTR && errno != EAGAIN) {
-	    perror("pmr: Write error");
-	    close_pipe(p);
-	    program_return_value = 1;
-	    return;
-	}
-
-	/* We only measure things for pipe 0 */
-	if (p->id == 0 && p->valid_time &&
-	    timetest(&bw, info, sizeof(info), p, 0)) {
-
-	    char byte_info[256];
-	    char unit[16];
-	    double total;
-
-	    size_transformation(&total, unit, p->wbytes);
-	    sprintf(byte_info, "\ttotal: %.2f %s (%lld bytes)", total, unit,
-		    p->wbytes);
-
-	    if (estimatedbytes > 0)
-		append_eta(byte_info, bw, p->wbytes);
-
-	    /* A check for just being pedantic. info[] is always long enough */
-	    if ((strlen(info) + strlen(byte_info) + 1) <= sizeof(info)) {
-		strcat(info, byte_info);
-		write_info(info);
-	    }
-	}
-    }
 }
-
 
 static void initialize_pipe(int id, int in_fd, int out_fd)
 {
-    struct pipe *p;
+	struct pipe *p;
 
-    p = &pipes[id];
+	p = &pipes[id];
 
-    memset(p, 0, sizeof(p[0]));
+	memset(p, 0, sizeof(p[0]));
 
-    p->id = id;
+	p->id = id;
 
-    p->in_fd = in_fd;
-    p->out_fd = out_fd;
+	p->in_fd = in_fd;
+	p->out_fd = out_fd;
 
-    p->max_rate = default_max_rate;
+	p->max_rate = default_max_rate;
 
-    /* get page size aligned buffer of size 'aligned_size' */
-    p->real_buf = malloc(buffer_size + PAGE_SIZE);
-    if (!p->real_buf) {
-	fprintf(stderr, "pmr: not enough memory\n");
-	exit(1);
-    }
-    p->aligned_buf = p->real_buf;
-    p->aligned_buf += PAGE_SIZE - (((long) p->aligned_buf) & (PAGE_SIZE - 1));
+	/* get page size aligned buffer of size 'aligned_size' */
+	p->real_buf = malloc(buffer_size + PAGE_SIZE);
+	if (!p->real_buf)
+		die("Not enough memory\n");
 
-    p->valid_time = 1;
-    if (gettimeofday(&p->rate_time, NULL)) {
-	perror("pmr: gettimeofday failed");
-	p->valid_time = 0;
-    }
+	p->aligned_buf = p->real_buf;
+	p->aligned_buf +=
+	    PAGE_SIZE - (((long)p->aligned_buf) & (PAGE_SIZE - 1));
 
-    p->measurement_time = p->rate_time;
+	p->valid_time = 1;
+	if (gettimeofday(&p->rate_time, NULL)) {
+		perror("pmr: gettimeofday() failed");
+		p->valid_time = 0;
+	}
 
-    MD5Init(&p->md5ctx);
+	p->measurement_time = p->rate_time;
 
-    n_pipes++;
+	MD5Init(&p->md5ctx);
+
+	n_pipes++;
 }
-
 
 static double inverse_size_transformation(const char *valuestr)
 {
-    char *endptr;
-    double value;
-    double multiplier;
-    int i;
+	char *endptr;
+	double value;
+	double multiplier;
+	int i;
 
-    value = strtod(valuestr, &endptr);
+	value = strtod(valuestr, &endptr);
 
-    if (endptr == valuestr)
-	return -1.0;
+	if (endptr == valuestr)
+		return -1.0;
 
-    while (*endptr != 0 && isspace(*endptr))
-	endptr++;
+	while (*endptr != 0 && isspace(*endptr))
+		endptr++;
 
-    if (*endptr == 0)
-	return value;
+	if (*endptr == 0)
+		return value;
 
-    multiplier = 1.0;
+	multiplier = 1.0;
 
-    /* we do case-sensitive comparison here to not mix bits and bytes */
-    if (strcmp(endptr, "B") == 0)
-	return value;
+	/* we do case-sensitive comparison here to not mix bits and bytes */
+	if (strcmp(endptr, "B") == 0)
+		return value;
 
-    /* case-insensitive comparisons for IEC units */
-    for (i = 0; i < NUNITS; i++) {
-	if (strncasecmp(endptr, iec_units[i], 2) == 0)
-	    return multiplier * value;
-	multiplier *= 1024.0;
-    }
+	/* case-insensitive comparisons for IEC units */
+	for (i = 0; i < NUNITS; i++) {
+		if (strncasecmp(endptr, iec_units[i], 2) == 0)
+			return multiplier * value;
+		multiplier *= 1024.0;
+	}
 
-    /* case-sensitive comparisons for bytes with SI units */
-    multiplier = 1.0;
-    for (i = 0; i < NUNITS; i++) {
-	if (strncmp(endptr, si_units[i], 2) == 0)
-	    return multiplier * value;
-	multiplier *= 1000.0;
-    }
+	/* case-sensitive comparisons for bytes with SI units */
+	multiplier = 1.0;
+	for (i = 0; i < NUNITS; i++) {
+		if (strncmp(endptr, si_units[i], 2) == 0)
+			return multiplier * value;
+		multiplier *= 1000.0;
+	}
 
-    /* case-sensitive comparisons for bits with SI multipliers */
-    multiplier = 1.0 / 8;
-    for (i = 0; i < NUNITS; i++) {
-	if (strncmp(endptr, bit_units[i], 2) == 0)
-	    return multiplier * value;
-	multiplier *= 1000.0;
-    }
+	/* case-sensitive comparisons for bits with SI multipliers */
+	multiplier = 1.0 / 8;
+	for (i = 0; i < NUNITS; i++) {
+		if (strncmp(endptr, bit_units[i], 2) == 0)
+			return multiplier * value;
+		multiplier *= 1000.0;
+	}
 
-    fprintf(stderr, "pmr error: unknown unit: %s\n", endptr);
-    exit(1);
-    return 0.0;
+	die("Unknown unit: %s\n", endptr);
+	/* never reached */
+	return 0.0;
 }
-
 
 static int open_new_file(struct pipe *p)
 {
-    char *fname;
+	char *fname;
 
-    if (n_files_read == n_files)
-	return 0;
+	if (n_files_read == n_files)
+		return 0;
 
-    close(p->in_fd);
+	close(p->in_fd);
 
-    fname = files[n_files_read++];
+	fname = files[n_files_read++];
 
-    p->in_fd = open(fname, O_RDONLY);
-    if (p->in_fd < 0) {
-	fprintf(stderr, "Error opening file %s: %s\n", fname, strerror(errno));
-	exit(1);
-    }
+	p->in_fd = open(fname, O_RDONLY);
+	if (p->in_fd < 0)
+		dieerror("Error opening file %s", fname);
 
-    return 1;
+	return 1;
 }
 
 
+static const char *USAGE =
+"pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n"
+"\n"
+"Usage:\n"
+"\n"
+" pmr [-l Bps] [-s size] [-m] [-t seconds] [-b size] [-i R] [-o R] [-r] [-v] [-e com | FILE ..]\n"
+"\n"
+" -b size\tSet input buffer size (default %d)\n"
+" -e com args..\tRun command \"com\" with args, copy stdin of pmr to the stdin of\n"
+"\t\tthe command, and copy stdout of the command to the stdout of\n"
+"\t\tpmr. pmr acts as a measuring filter between the shell and\n"
+"\t\tthe command. Note that this option changes the behavior of -i.\n"
+" -i R / --input-range R    R is in format x:y, where x is the number of bytes\n"
+"                to be skipped in the beginning of standard input, and y is the\n"
+"                total number of bytes to be written to standard output.\n"
+"                The behavior is different in -e mode. Instead of limiting\n"
+"                writes to standard output, this limits writes to the process.\n"
+" -l Bps\t\tLimit throughput to 'Bps' bytes per second. It is also\n"
+"\t\tpossible to use SI, IEC 60027 and bit units in the value.\n"
+"\t\tSI units include kB, MB, ..., IEC units include KiB, MiB, ...\n"
+"\t\tand bit units include kbit, Mbit, ...\n"
+" -m / --md5\tCompute an md5 checksum of the stream (useful for verifying\n"
+"\t\tdata integrity through TCP networks)\n"
+" -o R / --output-range R    Similar to --i / --input-range, but only has an\n"
+"                effect in -e mode. This can be used to skip data from the\n"
+"                executed process, and limit the total number of data written\n"
+"                to standard output.\n"
+" -r\t\tUse carriage return on output, no newline\n"
+" -s size\tCalculate ETA given a size estimate. Giving regular files\n"
+"\t\tas pmr parameters implies -s SUM, where SUM is the total\n"
+"\t\tsize of those files.\n"
+" -t secs\tUpdate interval in seconds\n"
+" -v\t\tPrint version, about, contact and home page information\n";
+
 static void print_usage(const char *pname)
 {
-    fprintf(stderr, "pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n\nUsage:\n\n", VERSION);
-    fprintf(stderr, " %s [-l Bps] [-s size] [-m] [-t seconds] [-b size] [-i R] [-o R] [-r] [-v] [-e com | FILE ..]\n\n",
-	    pname);
-    fprintf(stderr, " -b size\tSet input buffer size (default %d)\n", DEFAULT_BUFFER_SIZE);
-    fprintf(stderr,
-	    " -e com args..\tRun command \"com\" with args, copy stdin of pmr to the stdin of\n"
-	    "\t\tthe command, and copy stdout of the command to the stdout of\n"
-	    "\t\tpmr. pmr acts as a measuring filter between the shell and\n"
-	    "\t\tthe command. Note that this option changes the behavior of -i.\n"
-	    " -i R / --input-range R    R is in format x:y, where x is the number of bytes\n"
-	    "                to be skipped in the beginning of standard input, and y is the\n"
-	    "                total number of bytes to be written to standard output.\n"
-	    "                The behavior is different in -e mode. Instead of limiting\n"
-	    "                writes to standard output, this limits writes to the process.\n"
-
-
-	    " -l Bps\t\tLimit throughput to 'Bps' bytes per second. It is also\n"
-	    "\t\tpossible to use SI, IEC 60027 and bit units in the value.\n"
-	    "\t\tSI units include kB, MB, ..., IEC units include KiB, MiB, ...\n"
-	    "\t\tand bit units include kbit, Mbit, ...\n"
-	    " -m / --md5\tCompute an md5 checksum of the stream (useful for verifying\n"
-	    "\t\tdata integrity through TCP networks)\n"
-	    " -o R / --output-range R    Similar to --i / --input-range, but only has an\n"
-	    "                effect in -e mode. This can be used to skip data from the\n"
-	    "                executed process, and limit the total number of data written\n"
-	    "                to standard output.\n"
-	    " -r\t\tUse carriage return on output, no newline\n"
-	    " -s size\tCalculate ETA given a size estimate. Giving regular files\n"
-	    "\t\tas pmr parameters implies -s SUM, where SUM is the total\n"
-	    "\t\tsize of those files.\n"
-	    " -t secs\tUpdate interval in seconds\n"
-	    " -v\t\tPrint version, about, contact and home page information\n");
+	fprintf(stderr, USAGE, VERSION, DEFAULT_BUFFER_SIZE);
 }
 
 
 static void read_config(void)
 {
-    char *home;
-    char cfilename[PATH_MAX];
-    FILE *cfile;
-    char line[256];
-    char *word, *opt;
-    int t;
-    int ret;
+	char *home;
+	char cfilename[PATH_MAX];
+	FILE *cfile;
+	char line[256];
+	char *word, *opt;
+	int t;
+	int ret;
 
-    /* First try home directory */
-    home = getenv("HOME");
-    if (home == NULL)
-	return;
+	/* First try home directory */
+	home = getenv("HOME");
+	if (home == NULL)
+		return;
 
-    snprintf(cfilename, sizeof cfilename, "%s/.pmr", home);
-
-    cfile = fopen(cfilename, "r");
-    if (cfile == NULL) {
-
-	/* Then try /etc directory */
-	snprintf(cfilename, sizeof cfilename, "/etc/pmr");
+	snprintf(cfilename, sizeof cfilename, "%s/.pmr", home);
 
 	cfile = fopen(cfilename, "r");
-	if (cfile == NULL)
-	    return;
-    }
+	if (cfile == NULL) {
 
-    while (1) {
-	if (fgets(line, sizeof line, cfile) == NULL) {
-	    if (feof(cfile) || ferror(cfile))
-		break;
-	    continue;
+		/* Then try /etc directory */
+		snprintf(cfilename, sizeof cfilename, "/etc/pmr");
+
+		cfile = fopen(cfilename, "r");
+		if (cfile == NULL)
+			return;
 	}
 
-	if (line[0] == '#')
-	    continue;		/* comment line */
+	while (1) {
+		if (fgets(line, sizeof line, cfile) == NULL) {
+			if (feof(cfile) || ferror(cfile))
+				break;
+			continue;
+		}
 
-	ret = skip_ws(line, 0);
-	if (ret < 0)
-	    continue;		/* empty line */
+		if (line[0] == '#')
+			continue;	/* comment line */
 
-	word = &line[ret];
+		ret = skip_ws(line, 0);
+		if (ret < 0)
+			continue;	/* empty line */
 
-	/* Get second option from the line, if exists */
-	opt = NULL;
-	ret = skip_nws(line, ret);
-	if (ret > 0) {
-	    ret = skip_ws(line, ret);
-	    if (ret > 0) {
-		/* We have an option. zero-terminate it. */
-		opt = &line[ret];
-		ret = skip_nws(opt, 0);
-		if (ret > 0)
-		    opt[ret] = 0;
-	    }
+		word = &line[ret];
+
+		/* Get second option from the line, if exists */
+		opt = NULL;
+		ret = skip_nws(line, ret);
+		if (ret > 0) {
+			ret = skip_ws(line, ret);
+			if (ret > 0) {
+				/* We have an option. zero-terminate it. */
+				opt = &line[ret];
+				ret = skip_nws(opt, 0);
+				if (ret > 0)
+					opt[ret] = 0;
+			}
+		}
+
+		if (strncasecmp(word, "carriage_return", 8) == 0) {
+			use_carriage_return = 1;
+
+		} else if (strncasecmp(word, "limit", 5) == 0) {
+			if (opt == NULL) {
+				fprintf(stderr, "Missing limit value\n");
+				continue;
+			}
+			default_max_rate = get_bw_limit(opt);
+
+		} else if (strncasecmp(word, "md5", 3) == 0) {
+			use_md5 = 1;
+
+		} else if (strncasecmp(word, "update_interval", 3) == 0) {
+			if (opt == NULL) {
+				fprintf(stderr, "Missing update interval\n");
+				continue;
+			}
+			t = atoi(opt);
+			assert(t >= 0 && t < INT_MAX / 1000);
+			default_interval = 1000 * t;
+
+		} else {
+			fprintf(stderr, "Unknown configuration directive: %s\n",
+				word);
+		}
 	}
 
-	if (strncasecmp(word, "carriage_return", 8) == 0) {
-	    use_carriage_return = 1;
-
-	} else if (strncasecmp(word, "limit", 5) == 0) {
-	    if (opt == NULL) {
-		fprintf(stderr, "Missing limit value\n");
-		continue;
-	    }
-	    default_max_rate = get_bw_limit(opt);
-
-	} else if (strncasecmp(word, "md5", 3) == 0) {
-	    use_md5 = 1;
-
-	} else if (strncasecmp(word, "update_interval", 3) == 0) {
-	    if (opt == NULL) {
-		fprintf(stderr, "Missing update interval\n");
-		continue;
-	    }
-	    t = atoi(opt);
-	    assert(t >= 0 && t < INT_MAX / 1000);
-	    default_interval = 1000 * t;
-
-	} else {
-	    fprintf(stderr, "Unknown configuration directive: %s\n", word);
-	}
-    }
-
-    fclose(cfile);
+	fclose(cfile);
 }
-
 
 static int read_no_rate_limit(struct pipe *p)
 {
-    return read(p->in_fd, p->aligned_buf, buffer_size);
+	return read(p->in_fd, p->aligned_buf, buffer_size);
 }
 
 static int read_rate_limit(struct pipe *p)
 {
-    int ret;
-    int to_read, read_bytes;
-    int t;
-    struct timeval new_rate_time;
+	int ret;
+	int to_read, read_bytes;
+	int t;
+	struct timeval new_rate_time;
 
-    if (p->max_rate == -1)
-	return read_no_rate_limit(p);
+	if (p->max_rate == -1)
+		return read_no_rate_limit(p);
 
-    if (gettimeofday(&new_rate_time, NULL)) {
-	perror("pmr: gettimeofday failed. can not limit rate. going max speed.");
-	p->max_rate = -1;
-	return read_no_rate_limit(p);
-    }
-
-    if (p->rate_read_bytes > p->max_rate) {
-	fprintf(stderr, "fatal error: rate_read_bytes > max_rate!\n");
-	exit(1);
-    }
-
-    if (p->rate_read_bytes == p->max_rate) {
-	t = 1000 * (new_rate_time.tv_sec - p->rate_time.tv_sec) +
-	    ((int) new_rate_time.tv_usec) / 1000 -
-	    ((int) p->rate_time.tv_usec) / 1000;
-	if (t < 0) {
-	    fprintf(stderr,
-		    "pmr: chronoton particles detected. clock ran backwards. "
-		    "k3wl!\n");
-	    t = default_interval + 1;
-	}
-	if (t < 1000) {
-	    usleep(1000000 - 1000 * t);
-	    if (gettimeofday(&new_rate_time, NULL)) {
-		perror("pmr: gettimeofday failed. can not limit rate. going "
-		       "max speed.");
+	if (gettimeofday(&new_rate_time, NULL)) {
+		perror("pmr: gettimeofday() failed. Can not limit rate. "
+		       "Going max speed.");
 		p->max_rate = -1;
 		return read_no_rate_limit(p);
-	    }
-	}
-	p->rate_time = new_rate_time;
-	p->rate_read_bytes = 0;
-    }
-
-    to_read = p->max_rate - p->rate_read_bytes;
-    if (to_read > buffer_size)
-	to_read = buffer_size;
-
-    read_bytes = 0;
-
-    while (read_bytes < to_read) {
-
-	ret = read(p->in_fd, p->aligned_buf + read_bytes, to_read - read_bytes);
-	if (ret <= 0) {
-	    /* If 0 bytes read so far and an error happens, handle it on
-	       a higher level */
-	    if (ret < 0 && read_bytes == 0)
-		return -1;
-
-	    break;
 	}
 
-	read_bytes += ret;
-    }
+	assert(p->rate_read_bytes <= p->max_rate);
 
-    p->rate_read_bytes += read_bytes;
+	if (p->rate_read_bytes == p->max_rate) {
+		t = 1000 * (new_rate_time.tv_sec - p->rate_time.tv_sec) +
+		    ((int)new_rate_time.tv_usec) / 1000 -
+		    ((int)p->rate_time.tv_usec) / 1000;
+		if (t < 0) {
+			fprintf(stderr, "pmr: Chronoton particles detected! "
+				"The clock ran backwards. k3wl!\n");
+			t = default_interval + 1;
+		}
+		if (t < 1000) {
+			usleep(1000000 - 1000 * t);
+			if (gettimeofday(&new_rate_time, NULL)) {
+				perror("pmr: gettimeofday failed. Can not "
+				       "limit rate. Going max speed.");
+				p->max_rate = -1;
+				return read_no_rate_limit(p);
+			}
+		}
+		p->rate_time = new_rate_time;
+		p->rate_read_bytes = 0;
+	}
 
-    return read_bytes;
+	to_read = p->max_rate - p->rate_read_bytes;
+	if (to_read > buffer_size)
+		to_read = buffer_size;
+
+	read_bytes = 0;
+
+	while (read_bytes < to_read) {
+
+		ret = read(p->in_fd, p->aligned_buf + read_bytes,
+			   to_read - read_bytes);
+		if (ret <= 0) {
+			/* If 0 bytes read so far and an error happens,
+			   handle it on a higher level */
+			if (ret < 0 && read_bytes == 0)
+				return -1;
+
+			break;
+		}
+
+		read_bytes += ret;
+	}
+
+	p->rate_read_bytes += read_bytes;
+
+	return read_bytes;
 }
 
-
-static inline void set_fd(int *maxfd, int fd, fd_set *set)
+static inline void set_fd(int *maxfd, int fd, fd_set * set)
 {
-    if (*maxfd < fd)
-	*maxfd = fd;
+	if (*maxfd < fd)
+		*maxfd = fd;
 
-    FD_SET(fd, set);
+	FD_SET(fd, set);
 }
-
 
 static void size_transformation(double *size, char *unit, double srcsize)
 {
-    int order;
+	int order;
 
-    if (srcsize < 0) {
-	fprintf(stderr, "pmr bug: negative size in size_transformation()\n");
-	exit(1);
-    }
+	if (srcsize < 0)
+		die("Negative size in size_transformation()\n");
 
-    for (order = 0; order < NUNITS; order++) {
-	if (srcsize < 1024.0)
-	    break;
-	srcsize /= 1024.0;
-    }
+	for (order = 0; order < NUNITS; order++) {
+		if (srcsize < 1024.0)
+			break;
+		srcsize /= 1024.0;
+	}
 
-    if (order == NUNITS) {
-	fprintf(stderr, "pmr warning: too high a number for size_transformation()r\n");
-	order = NUNITS - 1;
-    }
+	if (order == NUNITS) {
+		fprintf(stderr,
+			"pmr warning: too high a number for size_transformation()r\n");
+		order = NUNITS - 1;
+	}
 
-    *size = srcsize;
-    strcpy(unit, iec_units[order]);
+	*size = srcsize;
+	strcpy(unit, iec_units[order]);
 }
-
 
 /* skip whitespace characters. return -1 if end of line reached */
 static int skip_ws(const char *line, int ind)
 {
-    while (isspace(line[ind]))
-	ind++;
+	while (isspace(line[ind]))
+		ind++;
 
-    if (line[ind] == 0)
-	ind = -1;
+	if (line[ind] == 0)
+		ind = -1;
 
-    return ind;
+	return ind;
 }
-
 
 /* skip non-whitespace characters. return -1 if end of line reached */
 static int skip_nws(const char *line, int ind)
 {
-    while (line[ind] != 0 && isspace(line[ind]) == 0)
-	ind++;
+	while (line[ind] != 0 && isspace(line[ind]) == 0)
+		ind++;
 
-    if (line[ind] == 0)
-	ind = -1;
+	if (line[ind] == 0)
+		ind = -1;
 
-    return ind;
+	return ind;
 }
-
 
 static void spawn_process(const char **args)
 {
-    int toprocess[2];
-    int fromprocess[2];
+	int toprocess[2];
+	int fromprocess[2];
 
-    if (pipe(toprocess) || pipe(fromprocess)) {
-	perror("pmr: can not pipe() for -e");
-	exit(1);
-    }
+	if (pipe(toprocess) || pipe(fromprocess))
+		dieerror("Can not pipe() for -e");
 
-    if (fork() == 0) {
+	if (fork() == 0) {
 
-	close(toprocess[1]);
-	close(fromprocess[0]);
+		close(toprocess[1]);
+		close(fromprocess[0]);
 
-	if (dup2(toprocess[0], 0) < 0 || dup2(fromprocess[1], 1) < 0) {
-	    perror("Can not dup for -e");
-	    exit(1);
+		if (dup2(toprocess[0], 0) < 0 || dup2(fromprocess[1], 1) < 0)
+			dieerror("Can not dup for -e");
+
+		execvp(args[0], (char *const *)args);
+
+		dieerror("Can not execute %s", args[0]);
 	}
 
-	execvp(args[0], (char * const *) args);
+	close(toprocess[0]);
+	close(fromprocess[1]);
 
-	fprintf(stderr, "pmr: can not execute %s (%s)\n",
-		args[0], strerror(errno));
-	
-	abort();
-    }
+	/* pipe 0: pmr stdin -> process stdin */
+	pipes[0].out_fd = toprocess[1];
 
-    close(toprocess[0]);
-    close(fromprocess[1]);
-
-    /* pipe 0: pmr stdin -> process stdin */
-    pipes[0].out_fd = toprocess[1];
-
-    /* pipe 1: process stdout -> pmr stdout */
-    initialize_pipe(1, fromprocess[0], 1);
+	/* pipe 1: process stdout -> pmr stdout */
+	initialize_pipe(1, fromprocess[0], 1);
 }
-
 
 static int timetest(double *bw, char *s, size_t maxlen, struct pipe *p,
 		    int force)
 {
-    struct timeval nt;
-    struct timeval *ot = &p->measurement_time;
-    int t;
+	struct timeval nt;
+	struct timeval *ot = &p->measurement_time;
+	int t;
 
-    *bw = 0.0;
+	*bw = 0.0;
 
-    strcpy(s, "bandwidth: NaN");
+	strcpy(s, "bandwidth: NaN");
 
-    if (gettimeofday(&nt, NULL)) {
-	/* time failed. bandwidth = NaN. return false. */
-	return 0;
-    }
-
-    t = 1000 * (nt.tv_sec - ot->tv_sec) + ((int) nt.tv_usec) / 1000 - ((int) ot->tv_usec) / 1000;
-
-    if (t < 0) {
-	fprintf(stderr, "pmr: chronoton particles detected. clock ran "
-		"backwards. k3wl!\n");
-	t = default_interval + 1;
-    }
-
-    if (t > default_interval || force) {
-
-	if (t) {
-	    double canonical_bw, real_bw;
-	    char id[16];
-
-	    real_bw = 1000.0 * p->measurement_bytes / t;
-
-	    *bw = real_bw;
-
-	    size_transformation(&canonical_bw, id, real_bw);
-	    snprintf(s, maxlen, "bandwidth: %.2f %s/s", canonical_bw, id);
+	if (gettimeofday(&nt, NULL)) {
+		/* time failed. bandwidth = NaN. return false. */
+		return 0;
 	}
 
-	*ot = nt;
-	p->measurement_bytes = 0;
+	t = 1000 * (nt.tv_sec - ot->tv_sec) + ((int)nt.tv_usec) / 1000 -
+	    ((int)ot->tv_usec) / 1000;
 
-	return 1;
-    }
+	if (t < 0) {
+		fprintf(stderr, "pmr: chronoton particles detected. clock ran "
+			"backwards. k3wl!\n");
+		t = default_interval + 1;
+	}
 
-    return 0;
+	if (t > default_interval || force) {
+
+		if (t) {
+			double canonical_bw, real_bw;
+			char id[16];
+
+			real_bw = 1000.0 * p->measurement_bytes / t;
+
+			*bw = real_bw;
+
+			size_transformation(&canonical_bw, id, real_bw);
+			snprintf(s, maxlen, "bandwidth: %.2f %s/s",
+				 canonical_bw, id);
+		}
+
+		*ot = nt;
+		p->measurement_bytes = 0;
+
+		return 1;
+	}
+
+	return 0;
 }
-
 
 static void write_info(const char *info)
 {
-    if (use_carriage_return) {
+	if (use_carriage_return) {
 
-	/* Writes length amount of spaces and then a carriage return (\r) */
-	assert(old_line_length >= 0);
+		/* Writes length amount of spaces and then
+		   a carriage return (\r) */
+		assert(old_line_length >= 0);
 
-	while (old_line_length >= SPACE_LENGTH) {
-	    fwrite(space, 1, SPACE_LENGTH, stderr);
-	    old_line_length -= SPACE_LENGTH;
-	}
+		while (old_line_length >= SPACE_LENGTH) {
+			fwrite(space, 1, SPACE_LENGTH, stderr);
+			old_line_length -= SPACE_LENGTH;
+		}
 
-	fwrite(space, 1, old_line_length, stderr);
+		fwrite(space, 1, old_line_length, stderr);
 
-	fprintf(stderr, "\r");
+		fprintf(stderr, "\r");
 
-	old_line_length = 0;
-
-	if (info != NULL) {
-	    /* Write info */
-	    old_line_length = fprintf(stderr, "%s\r", info) - 1;
-
-	    /* In case stderr is lost (how??) */
-	    if (old_line_length < 0)
 		old_line_length = 0;
-	}
 
-    } else {
-	if (info != NULL) {
-	    /* Write info */
-	    fprintf(stderr, "%s\n", info);
+		if (info != NULL) {
+			/* Write info */
+			old_line_length = fprintf(stderr, "%s\r", info) - 1;
+
+			/* In case stderr is lost (how??) */
+			if (old_line_length < 0)
+				old_line_length = 0;
+		}
+
+	} else {
+		if (info != NULL) {
+			/* Write info */
+			fprintf(stderr, "%s\n", info);
+		}
 	}
-    }
+}
+
+
+static void setup_signal_handlers(void)
+{
+	struct sigaction act;
+
+	act = (struct sigaction) {.sa_handler = ctrlc_and_pipe_handler};
+
+	if (sigaction(SIGPIPE, &act, NULL))
+		die("Can not set SIGPIPE\n");
+
+	if (sigaction(SIGINT, &act, NULL))
+		die("Can not set SIGINT\n");
+
+	act = (struct sigaction) {.sa_handler = child_handler};
+
+	if (sigaction(SIGCHLD, &act, NULL))
+		die("Can not set SIGCHLD\n");
 }
 
 
 int main(int argc, char **argv)
 {
-    struct sigaction act;
+	int valid_time;
+	struct timeval vot;
 
-    int valid_time;
-    struct timeval vot;
+	int i, ret;
+	int no_options = 0;
+	double presize = 0.0;
+	int exec_arg_i = -1;
 
-    int i, ret;
-    int no_options = 0;
-    double presize = 0.0;
-    int exec_arg_i = -1;
+	struct range rangeparameters[2] = {{.valid = 0},
+					   {.valid = 0}};
 
-    struct range rangeparameters[2] = {{.valid = 0},
-				       {.valid = 0}};
+	setup_signal_handlers();
 
-    read_config();
+	read_config();
 
-    for (i = 1; i < argc;) {
+	for (i = 1; i < argc;) {
 
-	if (no_options || argv[i][0] != '-') {
+		if (no_options || argv[i][0] != '-') {
 
-	    char *fname = argv[i];
-	    struct stat st;
+			char *fname = argv[i];
+			struct stat st;
 
-	    if (stat(fname, &st)) {
-		fprintf(stderr, "%s can not be read: %s\n", fname,
-			strerror(errno));
-		exit(1);
-	    }
+			if (stat(fname, &st)) {
+				fprintf(stderr, "Can not stat %s. Ignoring.\n",
+					fname);
+				i++;
+				continue;
+			}
 
-	    if (!S_ISREG(st.st_mode)) {
-		fprintf(stderr, "One of the files is not a regular file -> "
-			"no ETA estimation\n");
-		estimatedbytes = -1;
-	    }
+			if (!S_ISREG(st.st_mode)) {
+				fprintf(stderr, "%s is not a regular file "
+					"-> no ETA estimation\n", fname);
+				estimatedbytes = -1;
+			}
 
-	    if (estimatedbytes >= 0)
-		estimatedbytes += st.st_size;
+			if (estimatedbytes >= 0)
+				estimatedbytes += st.st_size;
 
-	    /* Build a regular file queue */
-	    darray_append(n_files, n_files_allocated, files, fname);
+			/* Build a regular file queue */
+			darray_append(n_files, n_files_allocated, files, fname);
 
-	    no_options = 1;
-	    i++;
-	    continue;
+			no_options = 1;
+			i++;
+			continue;
+		}
+
+		if (!strcmp(argv[i], "-b")) {
+			if ((i + 1) >= argc)
+				die("Expecting a value for -b\n");
+
+			buffer_size = atoi(argv[i + 1]);
+			i += 2;
+			continue;
+		}
+
+		if (!strcmp(argv[i], "-e") || !strcmp(argv[i], "--exec")) {
+			if ((i + 1) >= argc)
+				die("Too few arguments for -e\n");
+
+			exec_arg_i = i + 1;	/* store the index of command and its args */
+			break;
+		}
+
+		if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
+			print_usage(argv[0]);
+			exit(0);
+		}
+
+		if (!strcmp(argv[i], "-i") || !strcmp(argv[i], "--input-range")) {
+			if ((i + 1) >= argc)
+				die("Not enough args. Missing range.\n");
+
+			get_range(&rangeparameters[0], argv[i + 1]);
+			i += 2;
+			continue;
+		}
+
+		if (!strcmp(argv[i], "-l")) {
+			if ((i + 1) >= argc) {
+				die("Expecting a value for bandwidth limit"
+				    " (bytes per second)\n");
+			}
+
+			default_max_rate = get_bw_limit(argv[i + 1]);
+			i += 2;
+			continue;
+		}
+
+		if (!strcmp(argv[i], "-m") || !strcmp(argv[i], "--md5")) {
+			use_md5 = 1;
+			i++;
+			continue;
+		}
+
+		if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output-range")) {
+			if ((i + 1) >= argc)
+				die("Not enough args. Missing range.\n");
+
+			get_range(&rangeparameters[1], argv[i + 1]);
+			i += 2;
+			continue;
+		}
+
+		if (!strcmp(argv[i], "-r")) {
+			use_carriage_return = 1;
+			memset(space, 0, SPACE_LENGTH);
+			i++;
+			continue;
+		}
+
+		if (!strcmp(argv[i], "-s")) {
+			if ((i + 1) >= argc)
+				die("Not enough args. Missing size estimate.\n");
+
+			presize = inverse_size_transformation(argv[i + 1]);
+
+			if (presize < 0.0) {
+				fprintf(stderr,	"Braindamaged size estimate: "
+					"%f.\n", presize);
+				presize = 0.0;
+			}
+
+			i += 2;
+			continue;
+		}
+
+		if (!strcmp(argv[i], "-t")) {
+			if ((i + 1) >= argc)
+				die("Expecting a value for -t\n");
+
+			default_interval = 1000 * atoi(argv[i + 1]);
+			i += 2;
+			continue;
+		}
+
+		if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--version")) {
+			printf("pmr %s\n", VERSION);
+			exit(0);
+		}
+
+		if (!strcmp(argv[i], "--")) {
+			no_options = 1;
+			i++;
+			continue;
+		}
+
+		die("Unknown arg: %s\n", argv[i]);
 	}
 
-	if (!strcmp(argv[i], "-b")) {
-	    if ((i + 1) < argc) {
-		buffer_size = atoi(argv[i + 1]);
-	    } else {
-		fprintf(stderr, "expecting a value for -b\n");
-		exit(1);
-	    }
-	    i += 2;
-	    continue;
+	initialize_pipe(0, 0, 1);
+
+	if (exec_arg_i > 0) {
+		/* Create a pipe to terminate select() in main loop from child
+		   signal handler */
+		if (pipe(childpipe))
+			dieerror("Can not create a pipe for SIGCHLD");
+
+		/* Pipe 1 is initialized here */
+		spawn_process((const char **) &argv[exec_arg_i]);
+
+		/* Use non-blocking IO (select()) with 2 pipes */
+		for (i = 0; i < n_pipes; i++) {
+			fcntl(pipes[i].in_fd, F_SETFL, O_NONBLOCK);
+			fcntl(pipes[i].out_fd, F_SETFL, O_NONBLOCK);
+		}
 	}
 
-	if (!strcmp(argv[i], "-e") || !strcmp(argv[i], "--exec")) {
-	    if ((i + 1) >= argc) {
-		fprintf(stderr, "Too few arguments for -e\n");
-		exit(1);
-	    }
+	/* Record creation time of pipe 0 to determine total run-time of pmr */
+	valid_time = pipes[0].valid_time;
+	vot = pipes[0].measurement_time;
 
-	    exec_arg_i = i + 1; /* store the index of command and its args */
-	    break;
+	/* For ETA calculation when size was given with -s. This overrides
+	   byte size computed for regular file queue. */
+	if (presize > 0.0)
+		estimatedbytes = presize;
+
+	/* Open the first file in the regular file queue */
+	if (n_files > 0)
+		open_new_file(&pipes[0]);
+
+	/* Set pipe ranges */
+	if (rangeparameters[0].valid)
+		pipes[0].range = rangeparameters[0];
+
+	if (rangeparameters[1].valid) {
+		if (n_pipes == 1)
+			die("Output range may only be used in -e mode\n");
+
+		pipes[1].range = rangeparameters[1];
 	}
 
-	if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
-	    print_usage(argv[0]);
-	    exit(0);
+	while (terminated_pipes < n_pipes) {
+		fd_set rfds, wfds;
+		int maxfd;
+
+		/* Optimise the single pipe case (uses blocking IO) */
+		if (n_pipes == 1) {
+			handle_pipe(&pipes[0]);
+			continue;
+		}
+
+		FD_ZERO(&rfds);
+		FD_ZERO(&wfds);
+
+		maxfd = 0;
+
+		set_fd(&maxfd, childpipe[0], &rfds);
+
+		if (!pipes[0].terminated) {
+			if (pipes[0].wbytes == pipes[0].rbytes)
+				set_fd(&maxfd, pipes[0].in_fd, &rfds);
+			else
+				set_fd(&maxfd, pipes[0].out_fd, &wfds);
+		}
+
+		if (!pipes[1].terminated) {
+			if (pipes[1].wbytes == pipes[1].rbytes)
+				set_fd(&maxfd, pipes[1].in_fd, &rfds);
+			else
+				set_fd(&maxfd, pipes[1].out_fd, &wfds);
+		}
+
+		ret = select(maxfd + 1, &rfds, &wfds, NULL, NULL);
+
+		if (ret < 0 && errno != EINTR)
+			dieerror("select() error");
+
+		if (FD_ISSET(childpipe[0], &rfds))
+			close_pipe(&pipes[0]);
+
+		if (!pipes[0].terminated) {
+			if (FD_ISSET(pipes[0].in_fd, &rfds) ||
+			    FD_ISSET(pipes[0].out_fd, &wfds)) {
+				handle_pipe(&pipes[0]);
+			}
+		}
+
+		if (!pipes[1].terminated) {
+			if (FD_ISSET(pipes[1].in_fd, &rfds) ||
+			    FD_ISSET(pipes[1].out_fd, &wfds)) {
+				handle_pipe(&pipes[1]);
+			}
+		}
 	}
 
-	if (!strcmp(argv[i], "-i") || !strcmp(argv[i], "--input-range")) {
-	    if ((i + 1) >= argc) {
-		fprintf(stderr, "Not enough args. Missing range.\n");
-		exit(1);
-	    }
-	    get_range(&rangeparameters[0], argv[i + 1]);
-	    i += 2;
-	    continue;
-	}
+	do {
+		unsigned char md5[16];
+		double total;
+		char unit[16];
+		char info[256];
+		double bw;
 
-	if (!strcmp(argv[i], "-l")) {
-	    if ((i + 1) < argc) {
-		default_max_rate = get_bw_limit(argv[i + 1]);
-	    } else {
-		fprintf(stderr,
-			"expecting a value for bandwidth limit (bytes per second)\n");
-		exit(1);
-	    }
-	    i += 2;
-	    continue;
-	}
+		write_info(NULL);
 
-	if (!strcmp(argv[i], "-m") || !strcmp(argv[i], "--md5")) {
-	    use_md5 = 1;
-	    i++;
-	    continue;
-	}
+		if (program_return_value) {
+			fprintf(stderr, "Unexpected termination%s\n",
+				use_md5 ? " -> no MD5 sum" : "");
+		}
 
-	if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output-range")) {
-	    if ((i + 1) >= argc) {
-		fprintf(stderr, "Not enough args. Missing range.\n");
-		exit(1);
-	    }
-	    get_range(&rangeparameters[1], argv[i + 1]);
-	    i += 2;
-	    continue;
-	}
+		if (valid_time) {
+			/* Print average speed in human-readable form */
+			pipes[0].measurement_time = vot;
+			pipes[0].measurement_bytes = pipes[0].wbytes;
 
-	if (!strcmp(argv[i], "-r")) {
-	    use_carriage_return = 1;
-	    memset(space, 0, SPACE_LENGTH);
-	    i++;
-	    continue;
-	}
+			timetest(&bw, info, sizeof info, &pipes[0], 1);
 
-	if (!strcmp(argv[i], "-s")) {
-	    if ((i + 1) >= argc) {
-		fprintf(stderr,
-			"Not enough args. Missing size estimate.\n");
-		exit(1);
-	    }
+			fprintf(stderr, "average %s\n", info);
+		}
 
-	    presize = inverse_size_transformation(argv[i + 1]);
+		/* Print total data size in a human-readable form */
+		size_transformation(&total, unit, pipes[0].wbytes);
 
-	    if (presize < 0.0) {
-		fprintf(stderr, "Braindamaged size estimate: %f.\n",
-			presize);
-		presize = 0.0;
-	    }
+		fprintf(stderr, "total: %.2f %s (%lld bytes)\n", total, unit,
+			pipes[0].wbytes);
 
-	    i += 2;
-	    continue;
-	}
+		if (use_md5 && program_return_value == 0) {
+			MD5Final(md5, &pipes[0].md5ctx);
+			fprintf(stderr,
+				"md5sum: %.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x\n",
+				md5[0], md5[1], md5[2], md5[3], md5[4], md5[5],
+				md5[6], md5[7], md5[8], md5[9], md5[10],
+				md5[11], md5[12], md5[13], md5[14], md5[15]);
+		}
+	} while (0);
 
-	if (!strcmp(argv[i], "-t")) {
-	    if ((i + 1) < argc) {
-		default_interval = 1000 * atoi(argv[i + 1]);
-	    } else {
-		fprintf(stderr, "expecting a value for -t\n");
-		exit(1);
-	    }
-	    i += 2;
-	    continue;
-	}
+	close(1);
 
-	if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--version")) {
-	    printf("pmr %s\n", VERSION);
-	    exit(0);
-	}
-
-	if (!strcmp(argv[i], "--")) {
-	    no_options = 1;
-	    i++;
-	    continue;
-	}
-
-	fprintf(stderr, "unknown args: %s\n", argv[i]);
-	exit(1);
-    }
-
-    initialize_pipe(0, 0, 1);
-
-    if (exec_arg_i > 0) {
-	/* Create a pipe to terminate select() in main loop from child
-	   signal handler */
-	if (pipe(childpipe)) {
-	    perror("Can not create a pipe for the child handler");
-	    exit(1);
-	}
-
-	act = (struct sigaction) {.sa_handler = child_handler};
-	sigaction(SIGCHLD, &act, NULL);
-
-	/* Pipe 1 is initialized here */
-	spawn_process((const char **) &argv[exec_arg_i]);
-
-	/* Use non-blocking IO (select()) with 2 pipes */
-	for (i = 0; i < n_pipes; i++) {
-	    fcntl(pipes[i].in_fd, F_SETFL, O_NONBLOCK);
-	    fcntl(pipes[i].out_fd, F_SETFL, O_NONBLOCK);
-	}
-    }
-
-    /* Record creation time of pipe 0 to determine total run-time of pmr */
-    valid_time = pipes[0].valid_time;
-    vot = pipes[0].measurement_time;
-
-    act = (struct sigaction) {.sa_handler = ctrlc_and_pipe_handler};
-    sigaction(SIGPIPE, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-
-    /* For ETA calculation when size was given with -s. This overrides
-       byte size computed for regular file queue. */
-    if (presize > 0.0)
-	estimatedbytes = presize;
-
-    /* Open the first file in the regular file queue */
-    if (n_files > 0)
-	open_new_file(&pipes[0]);
-
-    /* Set pipe ranges */
-    if (rangeparameters[0].valid)
-	pipes[0].range = rangeparameters[0];
-
-    if (rangeparameters[1].valid) {
-	if (n_pipes == 1) {
-	    fprintf(stderr, "Output range may only be used in -e mode\n");
-	    exit(1);
-	}
-	pipes[1].range = rangeparameters[1];
-    }
-
-    while (terminated_pipes < n_pipes) {
-	fd_set rfds, wfds;
-	int maxfd;
-
-	/* Optimise the single pipe case (uses blocking IO) */
-	if (n_pipes == 1) {
-	    handle_pipe(&pipes[0]);
-	    continue;
-	}
-
-	FD_ZERO(&rfds);
-	FD_ZERO(&wfds);
-
-	maxfd = 0;
-
-	set_fd(&maxfd, childpipe[0], &rfds);
-
-	if (!pipes[0].terminated) {
-	    if (pipes[0].wbytes == pipes[0].rbytes)
-		set_fd(&maxfd, pipes[0].in_fd, &rfds);
-	    else
-		set_fd(&maxfd, pipes[0].out_fd, &wfds);
-	}
-
-	if (!pipes[1].terminated) {
-	    if (pipes[1].wbytes == pipes[1].rbytes)
-		set_fd(&maxfd, pipes[1].in_fd, &rfds);
-	    else
-		set_fd(&maxfd, pipes[1].out_fd, &wfds);
-	}
-
-	ret = select(maxfd + 1, &rfds, &wfds, NULL, NULL);
-
-	if (ret < 0 && errno != EINTR) {
-	    perror("pmr: select() error");
-	    exit(1);
-	}
-
-	if (FD_ISSET(childpipe[0], &rfds))
-	    close_pipe(&pipes[0]);
-
-	if (!pipes[0].terminated) {
-	    if (FD_ISSET(pipes[0].in_fd, &rfds) ||
-		FD_ISSET(pipes[0].out_fd, &wfds)) {
-		handle_pipe(&pipes[0]);
-	    }
-	}
-
-	if (!pipes[1].terminated) {
-	    if (FD_ISSET(pipes[1].in_fd, &rfds) ||
-		FD_ISSET(pipes[1].out_fd, &wfds)) {
-		handle_pipe(&pipes[1]);
-	    }
-	}
-    }
-
-    do {
-	unsigned char md5[16];
-	double total;
-	char unit[16];
-	char info[256];
-	double bw;
-
-	write_info(NULL);
-
-	if (program_return_value) {
-	    fprintf(stderr, "Unexpected termination%s\n",
-		    use_md5 ? " -> no MD5 sum" : "");
-	}
-
-	if (valid_time) {
-	    /* Print average speed in human-readable form */
-	    pipes[0].measurement_time = vot;
-	    pipes[0].measurement_bytes = pipes[0].wbytes;
-
-	    timetest(&bw, info, sizeof info, &pipes[0], 1);
-
-	    fprintf(stderr, "average %s\n", info);
-	}
-
-	/* Print total data size in a human-readable form */
-	size_transformation(&total, unit, pipes[0].wbytes);
-
-	fprintf(stderr, "total: %.2f %s (%lld bytes)\n", total, unit,
-		pipes[0].wbytes);
-
-	if (use_md5 && program_return_value == 0) {
-	    MD5Final(md5, &pipes[0].md5ctx);
-	    fprintf(stderr, "md5sum: %.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x\n",
-		    md5[0], md5[1], md5[2], md5[3], md5[4], md5[5], md5[6],
-		    md5[7], md5[8], md5[9], md5[10], md5[11], md5[12],
-		    md5[13], md5[14], md5[15]);
-	}
-    } while (0);
-
-    close(1);
-
-    return program_return_value;
+	return program_return_value;
 }
