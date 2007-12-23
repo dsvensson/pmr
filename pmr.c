@@ -577,7 +577,7 @@ static void read_config(void)
 
 	while (1) {
 		if (fgets(line, sizeof line, cfile) == NULL) {
-			if (feof(cfile) || ferror(cfile))
+			if (feof(cfile))
 				break;
 			continue;
 		}
