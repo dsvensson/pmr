@@ -6,3 +6,5 @@
  - select which pipe to limit in -e mode
  - add range support (does not affect bandwidth prints!)
  - Improve bandwidth reporting with rate limit modes
+ - Reduce burstiness of rate limit modes; make flow more steady rather than
+   bursty.
