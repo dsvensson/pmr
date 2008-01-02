@@ -39,6 +39,9 @@ static size_t buffer_size = DEFAULT_BUFFER_SIZE;
 #define PAGE_SIZE 8192
 #endif
 
+#define RATE_QUANTUM 50                     /* in milliseconds */
+#define MAX_RATE_WINDOW_SIZE 250            /* in milliseconds */
+
 struct range {
 	int valid;
 	long long start;
@@ -63,15 +66,17 @@ struct pipe {
 	struct timeval measurement_time;
 	long long measurement_bytes;
 
-	int max_rate;		/* -1 if no rate is not used */
+	long long max_rate;		/* -1 if no rate is not used */
+	long long effective_rate;       /* quota for a single time quantum */
 	int valid_time;
 	struct timeval rate_time;
-	int rate_read_bytes;
+	unsigned int rate_quota; /* measures bytes to read for rate limiting */
 
 	MD5_CTX md5ctx;
 
 	struct range range;
 };
+
 
 static void initialize_pipe(int id, int in_fd, int out_fd);
 static double inverse_size_transformation(const char *valuestr);
@@ -389,6 +394,7 @@ static void initialize_pipe(int id, int in_fd, int out_fd)
 	p->out_fd = out_fd;
 
 	p->max_rate = default_max_rate;
+	p->effective_rate = MAX(1, (p->max_rate * RATE_QUANTUM) / 1000);
 
 	/* get page size aligned buffer of size 'aligned_size' */
 	p->real_buf = malloc(buffer_size + PAGE_SIZE);
@@ -482,7 +488,6 @@ static int open_new_file(struct pipe *p)
 	return 1;
 }
 
-
 static const char *USAGE =
 "pmr %s by Heikki Orsila <heikki.orsila@iki.fi>\n"
 "\n"
@@ -521,7 +526,6 @@ static void print_usage(const char *pname)
 {
 	fprintf(stderr, USAGE, VERSION, DEFAULT_BUFFER_SIZE);
 }
-
 
 static void read_config(void)
 {
@@ -617,17 +621,20 @@ static int read_no_rate_limit(struct pipe *p)
 	return read(p->in_fd, p->aligned_buf, buffer_size);
 }
 
+/* Return time difference in milliseconds. Can be negative. */
+static int time_delta(struct timeval *new, struct timeval *old)
+{
+	return 1000 * (new->tv_sec - old->tv_sec) +
+		((int) new->tv_usec - (int) old->tv_usec) / 1000;
+}
+
 static int read_rate_limit(struct pipe *p)
 {
 	int ret;
-	int t;
+	int tdelta;
 	int to_read;
 	int read_bytes;
-	int effective_rate;
 	struct timeval new_rate_time;
-
-	if (p->max_rate == -1)
-		return read_no_rate_limit(p);
 
 	if (gettimeofday(&new_rate_time, NULL)) {
 		perror("pmr: gettimeofday() failed. Can not limit rate. "
@@ -636,35 +643,36 @@ static int read_rate_limit(struct pipe *p)
 		return read_no_rate_limit(p);
 	}
 
-	effective_rate = MAX(1, p->max_rate / 4);
+	if (p->rate_quota == 0) {
+		tdelta = time_delta(&new_rate_time, &p->rate_time);
 
-	assert(p->rate_read_bytes <= effective_rate);
+		if (tdelta < 0) {
+			tdelta = 0; /* time ran backwards */
 
-	if (p->rate_read_bytes == effective_rate) {
-		t = 1000 * (new_rate_time.tv_sec - p->rate_time.tv_sec) +
-		    ((int)new_rate_time.tv_usec) / 1000 -
-		    ((int)p->rate_time.tv_usec) / 1000;
-		if (t < 0) {
-			fprintf(stderr, "pmr: Chronoton particles detected! "
-				"The clock ran backwards. k3wl!\n");
-			t = default_interval + 1;
-		}
-		if (t < 250) {
-			usleep(1000 * (250 - t));
+		} else if (tdelta < RATE_QUANTUM) {
+			usleep(1000 * (RATE_QUANTUM - tdelta));
+
 			if (gettimeofday(&new_rate_time, NULL)) {
 				perror("pmr: gettimeofday failed. Can not "
 				       "limit rate. Going max speed.");
 				p->max_rate = -1;
 				return read_no_rate_limit(p);
 			}
+
+			tdelta = time_delta(&new_rate_time, &p->rate_time);
+			if (tdelta < 0)
+				tdelta = 0;
 		}
+
+		tdelta = MIN(tdelta, MAX_RATE_WINDOW_SIZE);
+
+		p->rate_quota += (p->effective_rate * tdelta) / RATE_QUANTUM;
+
 		p->rate_time = new_rate_time;
-		p->rate_read_bytes = 0;
 	}
 
-	to_read = effective_rate - p->rate_read_bytes;
-	if (to_read > buffer_size)
-		to_read = buffer_size;
+	to_read = MIN(p->rate_quota, buffer_size);
+	to_read = MAX(to_read, 1); /* read at least 1 byte to avoid EOF */
 
 	read_bytes = 0;
 
@@ -684,7 +692,7 @@ static int read_rate_limit(struct pipe *p)
 		read_bytes += ret;
 	}
 
-	p->rate_read_bytes += read_bytes;
+	p->rate_quota -= read_bytes;
 
 	return read_bytes;
 }
@@ -860,7 +868,6 @@ static void write_info(const char *info)
 	}
 }
 
-
 static void setup_signal_handlers(void)
 {
 	struct sigaction act;
@@ -878,7 +885,6 @@ static void setup_signal_handlers(void)
 	if (sigaction(SIGCHLD, &act, NULL))
 		die("Can not set SIGCHLD\n");
 }
-
 
 int main(int argc, char **argv)
 {
