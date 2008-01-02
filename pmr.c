@@ -24,36 +24,11 @@
 #include <ctype.h>
 
 #include "md5.h"
+#include "support.h"
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
-
-#define die(fmt, args...) do { fprintf(stderr, "pmr: " fmt, ## args); exit(1); } while(0)
-
-#define dieerror(fmt, args...) do { fprintf(stderr, "pmr: " fmt ": %s\n", ## args, strerror(errno)); exit(1); } while(0)
-
-#define MIN(x, y) ((x) <= (y) ? (x) : (y))
-
-#define darray_append(n, nallocated, array, item) do { \
-	assert((n) >= 0); \
-	assert((nallocated) >= 0); \
-	assert((n) <= (nallocated)); \
-					\
-	if ((n) == (nallocated)) { \
-		if ((nallocated) == 0) \
-			(nallocated) = 1; \
-		(nallocated) *= 2; \
-		assert((nallocated) > 0); \
-		(array) = realloc((array), (nallocated) * sizeof((array)[0])); \
-		if ((array) == NULL) { \
-			die("No memory for darray elements\n"); \
-		} \
-	} \
-		\
-	(array)[(n)] = (item); \
-	(n)++; \
-} while (0)
 
 #define VERSION "0.13"
 
@@ -114,7 +89,7 @@ static int terminated_pipes;
 static int program_return_value = EXIT_SUCCESS;
 static int childpipe[2] = { -1, -1 };
 
-static int default_interval = 2000;
+static int default_interval = 2000; /* time in milliseconds */
 
 static int use_md5;
 
@@ -320,13 +295,14 @@ static void handle_pipe(struct pipe *p)
 
 	if (p->rbytes == p->wbytes) {
 
-		if (p->range.valid && p->range.end >= 0
-		    && (p->rbytes == p->range.end)) {
+		if (p->range.valid && p->range.end >= 0 &&
+		    (p->rbytes == p->range.end)) {
 			ret = 0;
-		} else if (p->max_rate == -1)
+		} else if (p->max_rate == -1) {
 			ret = read_no_rate_limit(p);
-		else
+		} else {
 			ret = read_rate_limit(p);
+		}
 
 		/* Note, we will try to write all data received so far even if the
 		   program has been aborted (SIGINT) */
@@ -644,8 +620,10 @@ static int read_no_rate_limit(struct pipe *p)
 static int read_rate_limit(struct pipe *p)
 {
 	int ret;
-	int to_read, read_bytes;
 	int t;
+	int to_read;
+	int read_bytes;
+	int effective_rate;
 	struct timeval new_rate_time;
 
 	if (p->max_rate == -1)
@@ -658,9 +636,11 @@ static int read_rate_limit(struct pipe *p)
 		return read_no_rate_limit(p);
 	}
 
-	assert(p->rate_read_bytes <= p->max_rate);
+	effective_rate = MAX(1, p->max_rate / 4);
 
-	if (p->rate_read_bytes == p->max_rate) {
+	assert(p->rate_read_bytes <= effective_rate);
+
+	if (p->rate_read_bytes == effective_rate) {
 		t = 1000 * (new_rate_time.tv_sec - p->rate_time.tv_sec) +
 		    ((int)new_rate_time.tv_usec) / 1000 -
 		    ((int)p->rate_time.tv_usec) / 1000;
@@ -669,8 +649,8 @@ static int read_rate_limit(struct pipe *p)
 				"The clock ran backwards. k3wl!\n");
 			t = default_interval + 1;
 		}
-		if (t < 1000) {
-			usleep(1000000 - 1000 * t);
+		if (t < 250) {
+			usleep(1000 * (250 - t));
 			if (gettimeofday(&new_rate_time, NULL)) {
 				perror("pmr: gettimeofday failed. Can not "
 				       "limit rate. Going max speed.");
@@ -682,7 +662,7 @@ static int read_rate_limit(struct pipe *p)
 		p->rate_read_bytes = 0;
 	}
 
-	to_read = p->max_rate - p->rate_read_bytes;
+	to_read = effective_rate - p->rate_read_bytes;
 	if (to_read > buffer_size)
 		to_read = buffer_size;
 

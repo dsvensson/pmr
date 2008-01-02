@@ -1,14 +1,14 @@
 CC = {CC}
-CFLAGS = -Wall -O2
+CFLAGS = -Wall -O2 -g
+
+%.o:	%.c
+	$(CC) $(CFLAGS) -c $<
 
 pmr:	pmr.o md5c.o
 	$(CC) $(CFLAGS) -o pmr pmr.o md5c.o
 
-pmr.o:	pmr.c md5.h
-	$(CC) $(CFLAGS) -c pmr.c
-
+pmr.o:	pmr.c md5.h support.h
 md5c.o:	md5c.c md5.h
-	$(CC) $(CFLAGS) -c md5c.c
 
 install:	pmr
 	mkdir -p {PREFIX}/bin
