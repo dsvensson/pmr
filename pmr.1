@@ -5,7 +5,7 @@ pmr \- command line pipe measurement tool for Unixes
 
 .SH SYNTAX
 .B pmr
-[\fB-l Bps\fR] [\fB-s size\fR] [\fB-m\fR] [-i R] [-o R] [\fB-r\fR] [\fB-t secs\fR] [\fB-b size\fR] [\fB-v\fR] [\fB-e com\fR | FILE ...]
+[\fB-l Bps\fR] [\fB-s size\fR] [\fB-m\fR] [-i R] [-o R] [\fB-r\fR] [\fB-t secs\fR] [\fB-b size\fR] [\fB-v\fR] [\fB-e com args...\fR | FILE ...]
 
 .SH VERSION
 This man page documents pmr version 0.13 and maybe later.
@@ -26,23 +26,33 @@ specific default behavior. See CONFIGURATION FILE section.
 .SH OPTIONS
 .TP
 .B \-e com args
-Run command
+Execute command
 .I com
-with
-.I args
-, copy stdin of pmr to the stdin of he command, and copy stdout of the
-command to the stdout of pmr. pmr acts as a measuring filter between the
-shell and the command.
+with additional arguments, and copy the stdin of pmr to the stdin of
+the command, and copy stdout of the command to the stdout of pmr.
+pmr measures the rate of data going for the command.
+Example: "com1 |pmr -e filtercommand -x |com2" will copy data from
+com1 to filtercommand (filtercommand is given parameter -x), measure
+data rate, and then copy output of filtercommand to com2.
 .TP
 .B \-h
 Display help
 .TP
 .B \-i R / \-\-input\-range R
+Limit copying of data from stdin by argument R.
 R is in format x:y, where x is the number of bytes to be skipped in
-the beginning of standard input, and y is the total number of bytes to
-be written to standard output.  The behavior is different in -e
-mode. Instead of limiting writes to standard output, this limits
-writes to the process.
+the beginning of standard input. y is the total number of bytes to
+read from standard input.
+
+Either x or y may be omitted. With "-i x:", x bytes will be
+skipped. With "-i :y", only y bytes will be read.
+
+One may use IEC units with x and y, e.g. "-i 1KiB:".
+
+In -e mode this limits data that is copied to the external
+process.
+
+Example: "echo foo bar baz |pmr -i 4:7 2>/dev/null" will print just "bar".
 .TP
 .B \-l Bps
 Limit throughput to a given bytes per second rate
@@ -61,7 +71,7 @@ An example: pmr -l 64KiB < /dev/zero > /dev/null
 Compute an md5 checksum of the stream. This is useful for verifying data integrity through TCP networks.
 .TP
 .B \-o R / \-\-output\-range R
-Similar to --i / --input-range, but only has an effect in -e
+Similar to -i / --input-range, but only has an effect in -e
 mode. This can be used to skip data read from the executed process, and
 limit the total number of data written to standard output.
 .TP
