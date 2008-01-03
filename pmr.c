@@ -1,10 +1,12 @@
 /* pmr by Heikki Orsila <heikki.orsila@iki.fi>
-   This source is in public domain. Do what you want with it.
-
-   Get latest version of pmr from: http://www.iki.fi/shd/foss/pmr/
-
-   pmr displays the bandwidth of the pipe going through the process.
-*/
+ *
+ * This source is in public domain. You may do anything with it.
+ *
+ * Get latest version of pmr from: http://www.iki.fi/shd/foss/pmr/
+ *
+ * pmr displays the bandwidth of the pipe going through the process, and
+ * does several other things.
+ */
 
 #define _LARGEFILE64_SOURCE
 #define _FILE_OFFSET_BITS 64
@@ -30,7 +32,7 @@
 #define PATH_MAX 4096
 #endif
 
-#define VERSION "0.13"
+#define VERSION "1.00"
 
 #define DEFAULT_BUFFER_SIZE 8192
 static size_t buffer_size = DEFAULT_BUFFER_SIZE;

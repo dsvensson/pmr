@@ -1,3 +1,13 @@
+2008-01-03  Heikki Orsila <heikki.orsila@iki.fi>
+	* version 1.00
+	- Added several features (see -e, -i and -o)
+	- A few bug fixes
+	- Improve documentation
+	- Improve build system (C compiler can be selected with
+	  CC=cgcc ./configure)
+	- Install man page to a proper location (PREFIX/share/man/man1/)
+	NOTE: all changes between releases are documented in the Git log
+
 2007-02-15  Heikki Orsila <heikki.orsila@iki.fi>
 	* version 0.12
 	- Fixed the carriage return mode

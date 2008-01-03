@@ -14,16 +14,12 @@ md5c.o:	md5c.c md5.h
 
 install:	pmr
 	mkdir -p {PREFIX}/bin
-	mkdir -p {PREFIX}/man/man1
+	mkdir -p {PREFIX}/share/man/man1
 	install pmr {PREFIX}/bin/
-	install pmr.1 {PREFIX}/man/man1/
+	install doc/pmr.1 {PREFIX}/share/man/man1/
 
 check:	pmr
 	./check.sh
-
-mydist:
-	mkdir -p dist
-	cp configure Makefile.in pmr.c pmr.1 ChangeLog COPYING md5c.c md5.h md5.copyright dist/
 
 clean:	
 	rm -f *.o pmr
