@@ -37,4 +37,8 @@
 	(n)++; \
 } while (0)
 
+
+int skipws(const char *s, int i);
+int skipnws(const char *s, int i);
+
 #endif

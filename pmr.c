@@ -84,8 +84,6 @@ static int open_new_file(struct pipe *p);
 static int read_no_rate_limit(struct pipe *p);
 static int read_rate_limit(struct pipe *p);
 static void size_transformation(double *size, char *unit, double srcsize);
-static int skip_ws(const char *line, int ind);
-static int skip_nws(const char *line, int ind);
 static int timetest(double *bw, char *s, size_t maxlen, struct pipe *p,
 		    int force);
 static void write_info(const char *info);
@@ -340,8 +338,7 @@ static void handle_pipe(struct pipe *p)
 			p->readoffs += ret;
 
 			if (use_md5)
-				MD5Update(&p->md5ctx,
-					  (unsigned char *)p->aligned_buf, ret);
+				MD5Update(&p->md5ctx, (unsigned char *)p->aligned_buf, ret);
 
 		} else if (ret == 0) {
 			fprintf(stderr, "pmr: interesting: write returned 0\n");
@@ -493,33 +490,49 @@ static const char *USAGE =
 "\n"
 "Usage:\n"
 "\n"
-" pmr [-l Bps] [-s size] [-m] [-t seconds] [-b size] [-i R] [-o R] [-r] [-v] [-e com | FILE ..]\n"
+" pmr [-l Bps] [-s size] [-m] [-t seconds] [-b size] [-i R] [-o R] [-r] [-v] [-e com args... | FILE ..]\n"
 "\n"
 " -b size\tSet input buffer size (default %d)\n"
+"\n"
 " -e com args..\tRun command \"com\" with args, copy stdin of pmr to the stdin of\n"
 "\t\tthe command, and copy stdout of the command to the stdout of\n"
-"\t\tpmr. pmr acts as a measuring filter between the shell and\n"
-"\t\tthe command. Note that this option changes the behavior of -i.\n"
-" -i R / --input-range R    R is in format x:y, where x is the number of bytes\n"
-"                to be skipped in the beginning of standard input, and y is the\n"
-"                total number of bytes to be written to standard output.\n"
-"                The behavior is different in -e mode. Instead of limiting\n"
-"                writes to standard output, this limits writes to the process.\n"
+"\t\tpmr. pmr measures the data rate from stdin to the executed\n"
+"\t\tcommand. Note that this option changes the behavior of -i.\n"
+"\n"
+" -i R / --input-range R    Limit copying of data from stdin by argument R.\n"
+"                R is in format x:y, where x is the number of bytes\n"
+"                to be skipped in the beginning of standard input. y is the\n"
+"                total number of bytes to be read from standard input.\n"
+"\n"
+"                Either x or y may be omitted. With \"-i x:\", x bytes will be\n"
+"                skipped. With \"-i :y\", only y bytes will be read.\n"
+"\n"
+"                One may use IEC units with x and y, e.g. \"-i 1KiB:\".\n"
+"\n"
+"                In -e mode this limits data that is copied to the external\n"
+"                process.\n"
+"\n"
 " -l Bps\t\tLimit throughput to 'Bps' bytes per second. It is also\n"
 "\t\tpossible to use SI, IEC 60027 and bit units in the value.\n"
 "\t\tSI units include kB, MB, ..., IEC units include KiB, MiB, ...\n"
 "\t\tand bit units include kbit, Mbit, ...\n"
+"\n"
 " -m / --md5\tCompute an md5 checksum of the stream (useful for verifying\n"
 "\t\tdata integrity through TCP networks)\n"
+"\n"
 " -o R / --output-range R    Similar to --i / --input-range, but only has an\n"
 "                effect in -e mode. This can be used to skip data from the\n"
 "                executed process, and limit the total number of data written\n"
 "                to standard output.\n"
+"\n"
 " -r\t\tUse carriage return on output, no newline\n"
+"\n"
 " -s size\tCalculate ETA given a size estimate. Giving regular files\n"
 "\t\tas pmr parameters implies -s SUM, where SUM is the total\n"
 "\t\tsize of those files.\n"
+"\n"
 " -t secs\tUpdate interval in seconds\n"
+"\n"
 " -v\t\tPrint version, about, contact and home page information\n";
 
 static void print_usage(const char *pname)
@@ -565,7 +578,7 @@ static void read_config(void)
 		if (line[0] == '#')
 			continue;	/* comment line */
 
-		ret = skip_ws(line, 0);
+		ret = skipws(line, 0);
 		if (ret < 0)
 			continue;	/* empty line */
 
@@ -573,13 +586,13 @@ static void read_config(void)
 
 		/* Get second option from the line, if exists */
 		opt = NULL;
-		ret = skip_nws(line, ret);
+		ret = skipnws(line, ret);
 		if (ret > 0) {
-			ret = skip_ws(line, ret);
+			ret = skipws(line, ret);
 			if (ret > 0) {
 				/* We have an option. zero-terminate it. */
 				opt = &line[ret];
-				ret = skip_nws(opt, 0);
+				ret = skipnws(opt, 0);
 				if (ret > 0)
 					opt[ret] = 0;
 			}
@@ -726,30 +739,6 @@ static void size_transformation(double *size, char *unit, double srcsize)
 
 	*size = srcsize;
 	strcpy(unit, iec_units[order]);
-}
-
-/* skip whitespace characters. return -1 if end of line reached */
-static int skip_ws(const char *line, int ind)
-{
-	while (isspace(line[ind]))
-		ind++;
-
-	if (line[ind] == 0)
-		ind = -1;
-
-	return ind;
-}
-
-/* skip non-whitespace characters. return -1 if end of line reached */
-static int skip_nws(const char *line, int ind)
-{
-	while (line[ind] != 0 && isspace(line[ind]) == 0)
-		ind++;
-
-	if (line[ind] == 0)
-		ind = -1;
-
-	return ind;
 }
 
 static void spawn_process(const char **args)
@@ -947,7 +936,8 @@ int main(int argc, char **argv)
 			if ((i + 1) >= argc)
 				die("Too few arguments for -e\n");
 
-			exec_arg_i = i + 1;	/* store the index of command and its args */
+			/* store the index of command and its args */
+			exec_arg_i = i + 1;
 			break;
 		}
 

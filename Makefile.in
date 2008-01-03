@@ -1,13 +1,15 @@
 CC = {CC}
 CFLAGS = -Wall -O2 -g
+MODULES = pmr.o md5c.o support.o
 
 %.o:	%.c
 	$(CC) $(CFLAGS) -c $<
 
-pmr:	pmr.o md5c.o
-	$(CC) $(CFLAGS) -o pmr pmr.o md5c.o
+pmr:	$(MODULES)
+	$(CC) $(CFLAGS) -o pmr $(MODULES)
 
 pmr.o:	pmr.c md5.h support.h
+support.o:	support.c support.h
 md5c.o:	md5c.c md5.h
 
 install:	pmr
