@@ -1,0 +1,86 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>pmr</title>
+</head>
+<body>
+<h1>pmr description</h1>
+<b>pmr</b> is a tool for measuring data rate on the UNIX command line.
+It is licensed under Public Domain, and therefore its source code can be
+freely used for any purpose without restrictions.
+<p>
+It has following <b>features</b>:
+<ul>
+<li><b>Measure data rate</b> on the command line. pmr reads data
+from standard input and copies it to standard output.
+<br><br>
+<li><b>Limit data rate</b> to a specified speed (e.g. 100 KiB/s useful for
+  slow internet connections)
+  <ul>
+  <li> Example: copy files to another host with at most 100 KiB/s speed
+   <br><br>
+   <li>tar cv *files* |pmr -l 100KiB |nc -q0 host port
+   <br><br>
+  </ul>
+<li><b>Compute an md5sum</b> of the stream (useful for verifying integrity of
+    network transfers)
+
+  <ul>
+  <li>Example: copy files to another host and verify checksums on both sides
+   <br><br>
+   <li>Sender: tar cv *files* |pmr -m |nc -q0 host port
+   <br><br>
+   <li>Receiver: nc -l -p port |pmr -m |tar xv
+   <br><br>
+  </ul>
+
+<li><b>Calculate time estimate</b> of the copied data when the stream size
+is known
+   <ul>
+   <li>Example: copy files to another host and calculate an estimated time
+   of completion
+   <br><br>
+   <li>tar cv *files* |pmr -s 1GiB |nc -q0 host port
+   <br><br>
+   </ul>
+</ul>
+
+<h1>Download</h1>
+The latest release:
+<ul>
+<li><a href="pmr-0.13.tar.gz">pmr 0.13</a>
+</ul>
+Older releases:
+<ul>
+<li><a href="pmr-0.12.tar.gz">pmr 0.12</a>
+<li><a href="pmr-0.11.tar.gz">pmr 0.11</a>
+<li><a href="pmr-0.10.tar.gz">pmr 0.10</a>
+<li><a href="pmr-0.09.tar.gz">pmr 0.09</a>
+<li><a href="pmr-0.08.tar.gz">pmr 0.08</a>
+<li><a href="pmr-0.07.tar.gz">pmr 0.07</a>
+</ul>
+
+List of <a href="MD5">SHA1 sums</a> for releases.
+
+New releases are announced at
+<a href="http://freshmeat.net/projects/pmr">Freshmeat</a>. There you can subscribe to new
+releases of pmr.
+
+<h1>Version control repository (Git)</h1>
+To access pmr version control repository, please read
+<a href="http://zakalwe.fi/~shd/foss/Git.instructions.txt">
+Git instructions</a>.
+
+<h1>The author</h1>
+pmr was written by <a href="mailto:heikki.orsila@iki.fi">Heikki Orsila</a>.
+
+<h1>Other tools</h1>
+There are similar tools to pmr:
+<ul>
+<li><a href="http://www.maier-komor.de/mbuffer.html">mbuffer</a>
+<li><a href="http://spamaps.org/pipemeter.php">Pipemeter</a>
+<li><a href="http://www.ivarch.com/programs/pv.shtml">Pipe Viewer</a>
+</ul>
+</body>
+</html>
