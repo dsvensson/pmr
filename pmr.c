@@ -32,7 +32,7 @@
 #define PATH_MAX 4096
 #endif
 
-#define VERSION "1.00"
+#define VERSION "1.01"
 
 #define DEFAULT_BUFFER_SIZE 8192
 static size_t buffer_size = DEFAULT_BUFFER_SIZE;
