@@ -110,7 +110,7 @@ static size_t n_files_allocated;
 static char **files;
 static long long estimatedbytes;
 
-#define SPEED_WINDOW_SIZE 3
+#define SPEED_WINDOW_SIZE 10
 static double speed_window[SPEED_WINDOW_SIZE];
 
 #define SPACE_LENGTH 80
