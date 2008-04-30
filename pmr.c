@@ -863,7 +863,8 @@ static void setup_signal_handlers(void)
 {
 	struct sigaction act;
 
-	act = (struct sigaction) {.sa_handler = ctrlc_and_pipe_handler};
+	memset(&act, 0, sizeof act);
+	act.sa_handler = ctrlc_and_pipe_handler;
 
 	if (sigaction(SIGPIPE, &act, NULL))
 		die("Can not set SIGPIPE\n");
@@ -871,7 +872,8 @@ static void setup_signal_handlers(void)
 	if (sigaction(SIGINT, &act, NULL))
 		die("Can not set SIGINT\n");
 
-	act = (struct sigaction) {.sa_handler = child_handler};
+	memset(&act, 0, sizeof act);
+	act.sa_handler = child_handler;
 
 	if (sigaction(SIGCHLD, &act, NULL))
 		die("Can not set SIGCHLD\n");
