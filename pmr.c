@@ -173,7 +173,11 @@ static void append_eta(char *info, double bw, long long tbytes)
 static void child_handler(int sig)
 {
 	char token = 0;
-	write(childpipe[1], &token, 1);
+	ssize_t ret;
+
+	ret = write(childpipe[1], &token, 1);
+	if (ret != 1)
+		fprintf(stderr, "Could not write from child_handler\n");
 }
 
 static void close_pipe(struct pipe *p)
@@ -832,11 +836,11 @@ static void write_info(const char *info)
 		assert(old_line_length >= 0);
 
 		while (old_line_length >= SPACE_LENGTH) {
-			fwrite(space, 1, SPACE_LENGTH, stderr);
+			(void) xfwrite(space, SPACE_LENGTH, 1, stderr);
 			old_line_length -= SPACE_LENGTH;
 		}
 
-		fwrite(space, 1, old_line_length, stderr);
+		(void) xfwrite(space, old_line_length, 1, stderr);
 
 		fprintf(stderr, "\r");
 

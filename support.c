@@ -31,3 +31,20 @@ int skipnws(const char *s, int i)
 
 	return i;
 }
+
+size_t xfwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+	size_t ret;
+	size_t written = 0;
+	char *writeptr = (char *) ptr;
+
+	while (written < nmemb) {
+		ret = fwrite(writeptr, size, nmemb - written, stream);
+		if (ret == 0)
+			break;
+		written += ret;
+		writeptr += size * ret;
+	}
+
+	return written;
+}

@@ -41,4 +41,6 @@
 int skipws(const char *s, int i);
 int skipnws(const char *s, int i);
 
+size_t xfwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
+
 #endif
