@@ -119,7 +119,7 @@ br
 Transfer files with TCP from one host to another and simultaneously
 verify data checksums with MD5:
 .ft B
-tar cv SHELL_PATTERN |pmr -m |nc host port
+tar cv SHELL_PATTERN |pmr -m |nc -q0 host port
 
 .ft R
 The receiving end does:
