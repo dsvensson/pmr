@@ -738,9 +738,9 @@ static void size_transformation(double *size, char *unit, double srcsize)
 	}
 
 	if (order == NUNITS) {
-		fprintf(stderr,
-			"pmr warning: too high a number for size_transformation()r\n");
+		fprintf(stderr, "pmr warning: too high a number for size_transformation()r\n");
 		order = NUNITS - 1;
+		srcsize *= 1024.0;
 	}
 
 	*size = srcsize;
