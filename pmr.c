@@ -162,9 +162,7 @@ static void append_eta(char *info, double bw, long long tbytes)
 	if (bytesleft < 0) {
 		sprintf(str, "\tETA: -");
 	} else {
-		double eta = bytesleft / (sum / nvalid);
-
-		sprintf(str, "\tETA: %.1fs", eta);
+		sprintf(str, "\tETA: %us", (unsigned int) (bytesleft / (sum / nvalid)));
 	}
 
 	strcat(info, str);
