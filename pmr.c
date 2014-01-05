@@ -85,7 +85,8 @@ static double inverse_size_transformation(const char *valuestr);
 static int open_new_file(struct pipe *p);
 static int read_no_rate_limit(struct pipe *p);
 static int read_rate_limit(struct pipe *p);
-static void size_transformation(double *size, char *unit, double srcsize);
+static void size_transformation(double *size, char *unit, size_t maxlen,
+				double srcsize);
 static int timetest(double *bw, char *s, size_t maxlen, struct pipe *p,
 		    int force);
 static void write_info(const char *info);
@@ -208,7 +209,7 @@ static int get_bw_limit(const char *limit)
 		    limit, value);
 	}
 
-	return (int)value;
+	return (int) value;
 }
 
 static void get_range(struct range *r, const char *parameter)
@@ -364,14 +365,18 @@ static void handle_pipe(struct pipe *p)
 			char unit[16];
 			double total;
 
-			size_transformation(&total, unit, p->wbytes);
+			size_transformation(&total, unit, sizeof unit,
+					    p->wbytes);
 			sprintf(byte_info, "\ttotal: %.2f %s (%lld bytes)",
 				total, unit, p->wbytes);
 
 			if (estimatedbytes > 0)
 				append_eta(byte_info, bw, p->wbytes);
 
-			/* A check for just being pedantic. info[] is always long enough */
+			/*
+			 * A check for just being pedantic.
+			 * info[] is always long enough.
+			 */
 			if ((strlen(info) + strlen(byte_info) + 1) <=
 			    sizeof(info)) {
 				strcat(info, byte_info);
@@ -559,13 +564,17 @@ static void read_config(void)
 	if (home == NULL)
 		return;
 
-	snprintf(cfilename, sizeof cfilename, "%s/.pmr", home);
+	if (snprintf(cfilename, sizeof cfilename, "%s/.pmr", home) >=
+	    sizeof cfilename)
+		die("No space for config filename\n");
 
 	cfile = fopen(cfilename, "r");
 	if (cfile == NULL) {
 
 		/* Then try /etc directory */
-		snprintf(cfilename, sizeof cfilename, "/etc/pmr");
+		if (snprintf(cfilename, sizeof cfilename, "/etc/pmr") >=
+		    sizeof cfilename)
+			die("No space for config filename (/etc/pmr)\n");
 
 		cfile = fopen(cfilename, "r");
 		if (cfile == NULL)
@@ -722,7 +731,8 @@ static inline void set_fd(int *maxfd, int fd, fd_set * set)
 	FD_SET(fd, set);
 }
 
-static void size_transformation(double *size, char *unit, double srcsize)
+static void size_transformation(double *size, char *unit, size_t maxlen,
+				double srcsize)
 {
 	int order;
 
@@ -736,13 +746,15 @@ static void size_transformation(double *size, char *unit, double srcsize)
 	}
 
 	if (order == NUNITS) {
-		fprintf(stderr, "pmr warning: too high a number for size_transformation()r\n");
+		fprintf(stderr, "pmr warning: too high a number for "
+			"size_transformation()r\n");
 		order = NUNITS - 1;
 		srcsize *= 1024.0;
 	}
 
 	*size = srcsize;
-	strcpy(unit, iec_units[order]);
+	if (snprintf(unit, maxlen, "%s", iec_units[order]) >= maxlen)
+		die("No space for unit\n");
 }
 
 static void spawn_process(const char **args)
@@ -785,7 +797,8 @@ static int timetest(double *bw, char *s, size_t maxlen, struct pipe *p,
 
 	*bw = 0.0;
 
-	strcpy(s, "bandwidth: NaN");
+	if (snprintf(s, maxlen, "bandwidth: NaN") >= maxlen)
+		die("No space for bandwidth string (NaN)\n");
 
 	if (gettimeofday(&nt, NULL)) {
 		/* time failed. bandwidth = NaN. return false. */
@@ -811,9 +824,11 @@ static int timetest(double *bw, char *s, size_t maxlen, struct pipe *p,
 
 			*bw = real_bw;
 
-			size_transformation(&canonical_bw, id, real_bw);
-			snprintf(s, maxlen, "bandwidth: %.2f %s/s",
-				 canonical_bw, id);
+			size_transformation(&canonical_bw, id, sizeof id,
+					    real_bw);
+			if (snprintf(s, maxlen, "bandwidth: %.2f %s/s",
+				     canonical_bw, id) >= maxlen)
+				die("No space for bandwidth string\n");
 		}
 
 		*ot = nt;
@@ -1154,7 +1169,7 @@ int main(int argc, char **argv)
 		}
 
 		/* Print total data size in a human-readable form */
-		size_transformation(&total, unit, pipes[0].wbytes);
+		size_transformation(&total, unit, sizeof unit, pipes[0].wbytes);
 
 		fprintf(stderr, "total: %.2f %s (%lld bytes)\n", total, unit,
 			pipes[0].wbytes);
