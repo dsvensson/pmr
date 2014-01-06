@@ -119,6 +119,8 @@ static char space[SPACE_LENGTH];
 static int old_line_length;
 static int use_carriage_return;
 
+static const char *prefix_tag;
+
 #define NUNITS (9)
 
 static const char *iec_units[NUNITS] = { "B", "KiB", "MiB", "GiB", "TiB",
@@ -298,7 +300,7 @@ static void handle_pipe(struct pipe *p)
 	ssize_t ret;
 	void *rdata;
 	double bw;
-	char info[256];
+	char info[512];
 	size_t towrite;
 
 	if (p->rbytes == p->wbytes) {
@@ -499,7 +501,7 @@ static const char *USAGE =
 "\n"
 "Usage:\n"
 "\n"
-" pmr [-l Bps] [-s size] [-m] [-t seconds] [-b size] [-i R] [-o R] [-r] [-v] [-e com args... | FILE ..]\n"
+" pmr [-b size] [-i R] [-l Bps] [-m] [-o R] [-r] [-s size] [-t seconds] [--tag string] [-v] [-e com args.. | FILE..]\n"
 "\n"
 " -b size\tSet input buffer size (default %d)\n"
 "\n"
@@ -541,6 +543,8 @@ static const char *USAGE =
 "\t\tsize of those files.\n"
 "\n"
 " -t secs\tUpdate interval in seconds\n"
+"\n"
+" --tag string\tPrint \"tag: string\" on every status output line.\n"
 "\n"
 " -v\t\tPrint version, about, contact and home page information\n";
 
@@ -723,7 +727,7 @@ static int read_rate_limit(struct pipe *p)
 	return read_bytes;
 }
 
-static inline void set_fd(int *maxfd, int fd, fd_set * set)
+static inline void set_fd(int *maxfd, int fd, fd_set *set)
 {
 	if (*maxfd < fd)
 		*maxfd = fd;
@@ -793,21 +797,35 @@ static int timetest(double *bw, char *s, size_t maxlen, struct pipe *p,
 {
 	struct timeval nt;
 	struct timeval *ot = &p->measurement_time;
+	char bw_string[256];
+	char prefix[256];
+	int ret = 0;
 	int t;
 
 	*bw = 0.0;
 
-	if (snprintf(s, maxlen, "bandwidth: NaN") >= maxlen)
+	if (maxlen == 0)
+		die("No space for bandwidth string\n");
+	s[0] = 0;
+
+	prefix[0] = 0;
+	if (prefix_tag != NULL) {
+		if (snprintf(prefix, sizeof prefix, "tag: %s\t", prefix_tag) >=
+		    sizeof prefix)
+			die("Too long a prefix\n");
+	}
+
+	if (snprintf(bw_string, sizeof bw_string, "bandwidth: NaN") >=
+	    sizeof bw_string)
 		die("No space for bandwidth string (NaN)\n");
 
 	if (gettimeofday(&nt, NULL)) {
-		/* time failed. bandwidth = NaN. return false. */
+		/* time failed. Return empty string. */
 		return 0;
 	}
 
 	t = 1000 * (nt.tv_sec - ot->tv_sec) + ((int)nt.tv_usec) / 1000 -
-	    ((int)ot->tv_usec) / 1000;
-
+	    ((int) ot->tv_usec) / 1000;
 	if (t < 0) {
 		fprintf(stderr, "pmr: chronoton particles detected. clock ran "
 			"backwards. k3wl!\n");
@@ -815,7 +833,6 @@ static int timetest(double *bw, char *s, size_t maxlen, struct pipe *p,
 	}
 
 	if (t > default_interval || force) {
-
 		if (t) {
 			double canonical_bw, real_bw;
 			char id[16];
@@ -826,18 +843,20 @@ static int timetest(double *bw, char *s, size_t maxlen, struct pipe *p,
 
 			size_transformation(&canonical_bw, id, sizeof id,
 					    real_bw);
-			if (snprintf(s, maxlen, "bandwidth: %.2f %s/s",
-				     canonical_bw, id) >= maxlen)
+			if (snprintf(bw_string, sizeof bw_string,
+				     "bandwidth: %.2f %s/s",
+				     canonical_bw, id) >= sizeof bw_string)
 				die("No space for bandwidth string\n");
 		}
-
 		*ot = nt;
 		p->measurement_bytes = 0;
-
-		return 1;
+		ret = 1;
 	}
 
-	return 0;
+	if (snprintf(s, maxlen, "%s%s", prefix, bw_string) >= maxlen)
+		die("No space for bandwidth string with prefix\n");
+
+	return ret;
 }
 
 static void write_info(const char *info)
@@ -1034,6 +1053,18 @@ int main(int argc, char **argv)
 			continue;
 		}
 
+		if (!strcmp(argv[i], "--tag")) {
+			if ((i + 1) >= argc)
+				die("Expecting a value for --tag\n");
+			prefix_tag = strdup(argv[i + 1]);
+			if (prefix_tag == NULL)
+				die("No memory for --tag\n");
+			if (strlen(prefix_tag) > 256)
+				die("tag may not be longer than 256 bytes\n");
+			i += 2;
+			continue;
+		}
+
 		if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--version")) {
 			printf("pmr %s\n", VERSION);
 			exit(0);
@@ -1148,7 +1179,7 @@ int main(int argc, char **argv)
 		unsigned char md5[16];
 		double total;
 		char unit[16];
-		char info[256];
+		char info[512];
 		double bw;
 
 		write_info(NULL);
@@ -1165,7 +1196,7 @@ int main(int argc, char **argv)
 
 			timetest(&bw, info, sizeof info, &pipes[0], 1);
 
-			fprintf(stderr, "average %s\n", info);
+			fprintf(stderr, "%s (average)\n", info);
 		}
 
 		/* Print total data size in a human-readable form */
